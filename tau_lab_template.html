@@ -179,6 +179,33 @@
     </div>
   </section>
 
+  <!-- ============ Panel 5 敏感性扫描 ============ -->
+  <section>
+    <h2><span class="tag">稳健性</span>敏感性扫描</h2>
+    <p class="desc">龙卷风图：每个参数 ±扰动幅度 后指标的摆动区间，按影响降序——最上面的就是最能撼动结论的参数。下方 1D 扫描把「结论翻转区」直接着色。</p>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label>输出指标</label>
+          <select id="c-metric">
+            <option value="m1">2层折叠频率增益 @1.5μm</option>
+            <option value="m2">判据反转点 pitch</option>
+            <option value="m3">异构折叠可持续频率</option>
+            <option value="m4">MoE UB/RDMA 加速比</option>
+            <option value="m5">级联全开加速比</option>
+          </select></div>
+        <div class="ctl"><label>扰动幅度 ± <b id="v-perturb">30%</b></label>
+          <input type="range" id="c-perturb" min="10" max="50" step="5" value="30"></div>
+        <div class="ctl" style="margin-top:6px"><label>1D 扫描参数</label>
+          <select id="c-sweepparam"></select></div>
+      </div>
+      <div class="charts">
+        <div class="stats" id="s-sens"></div>
+        <div class="fig"><h4 id="t-tornado">龙卷风图</h4><div id="ch-tornado"></div></div>
+        <div class="fig"><h4 id="t-sweep">1D 扫描（红色区 = 结论翻转）</h4><div id="ch-sweep"></div></div>
+      </div>
+    </div>
+  </section>
+
   <footer>τ Lab · 模型与参数出处见仓库 tau_sim/params.py 与 REPORT.md · 静态报告页为另一 Artifact「τ Scaling 全栈级联仿真验证」</footer>
 </div>
 <div id="tip"></div>
@@ -471,11 +498,92 @@
     ]);
   }
 
+  /* ================= Panel 5 敏感性 ================= */
+  function tornadoChart(el, data, unit) {
+    const rows = data.rows;
+    const W = 720, L = 130, R = 60, T = 10, BH = 22, GAP = 9;
+    const H = T + rows.length * (BH + GAP) + 30;
+    const vals = rows.flatMap(r => [r.lo, r.hi]).concat([data.base]);
+    let v0 = Math.min(...vals), v1 = Math.max(...vals);
+    const pad = (v1 - v0) * 0.12 || 1; v0 -= pad; v1 += pad;
+    const px = v => L + (v - v0) / (v1 - v0) * (W - L - R);
+    let g = `<line x1="${px(data.base)}" y1="${T}" x2="${px(data.base)}" y2="${H - 26}" stroke="#898781" stroke-width="1" stroke-dasharray="3 3"/>`;
+    g += `<text x="${px(data.base)}" y="${H - 12}" text-anchor="middle" font-size="10" fill="#52514e">基线 ${fmtNum(data.base)}${unit}</text>`;
+    rows.forEach((r, i) => {
+      const y = T + i * (BH + GAP);
+      g += `<text x="${L - 8}" y="${y + BH / 2 + 3.5}" text-anchor="end" font-size="11" fill="#52514e">${r.label}</text>`;
+      const seg = (v, col) => {
+        const a = Math.min(px(v), px(data.base)), w = Math.abs(px(v) - px(data.base));
+        return `<rect x="${a}" y="${y}" width="${Math.max(w, 1)}" height="${BH}" rx="2" fill="${col}" fill-opacity="0.85"><title>${fmtNum(v)}${unit}</title></rect>`;
+      };
+      g += seg(r.lo, COLORS.blue) + seg(r.hi, COLORS.yellow);
+      const ext = Math.abs(px(r.hi) - px(data.base)) > Math.abs(px(r.lo) - px(data.base)) ? r.hi : r.lo;
+      g += `<text x="${px(ext) + (px(ext) > px(data.base) ? 5 : -5)}" y="${y + BH / 2 + 3.5}" text-anchor="${px(ext) > px(data.base) ? 'start' : 'end'}" font-size="10" font-family="ui-monospace,monospace" fill="#52514e">${fmtNum(r.lo)} ~ ${fmtNum(r.hi)}</text>`;
+    });
+    g += `<rect x="${L}" y="${H - 24}" width="10" height="10" rx="2" fill="${COLORS.blue}"/><text x="${L + 14}" y="${H - 15}" font-size="10.5" fill="#52514e">参数 −扰动</text>`;
+    g += `<rect x="${L + 100}" y="${H - 24}" width="10" height="10" rx="2" fill="${COLORS.yellow}"/><text x="${L + 114}" y="${H - 15}" font-size="10.5" fill="#52514e">参数 +扰动</text>`;
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
+  }
+
+  const selP = $('c-sweepparam');
+  M.PARAMS.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id; o.textContent = p.label;
+    selP.appendChild(o);
+  });
+
+  function panel5() {
+    const mid = $('c-metric').value;
+    const s = +$('c-perturb').value / 100;
+    $('v-perturb').textContent = $('c-perturb').value + '%';
+    const met = M.METRICS[mid];
+    const data = M.tornado(mid, s);
+    $('t-tornado').textContent = `龙卷风图：${met.label}（${met.unit}），参数 ±${(s * 100).toFixed(0)}%`;
+    tornadoChart($('ch-tornado'), data, met.unit);
+
+    const pid = selP.value || M.PARAMS[0].id;
+    const sw = M.sweep1d(mid, pid, 31);
+    const pLabel = M.PARAMS.find(x => x.id === pid).label;
+    $('t-sweep').textContent = `1D 扫描：${pLabel} × 0.5~1.5（红色区 = ${met.flipDesc}）`;
+    // 翻转区间（连续段）
+    lineChart($('ch-sweep'), {
+      series: [{ name: met.label, color: COLORS.blue, pts: sw.pts.map(p => [p[0], p[1]]) }],
+      xLabel: pLabel + '（相对基线倍数）', yLabel: met.unit, markX: 1.0,
+    });
+    // 叠加翻转区着色
+    const svg = $('ch-sweep').querySelector('svg');
+    const ov = svg.querySelector('#ov');
+    const ox = +ov.getAttribute('x'), ow = +ov.getAttribute('width');
+    const oy = +ov.getAttribute('y'), oh = +ov.getAttribute('height');
+    let shade = '';
+    let start = null;
+    sw.pts.forEach((p, i) => {
+      if (p[2] && start === null) start = p[0];
+      if ((!p[2] || i === sw.pts.length - 1) && start !== null) {
+        const end = p[2] ? p[0] : sw.pts[Math.max(i - 1, 0)][0];
+        const x1 = ox + (start - 0.5) / 1.0 * ow, x2 = ox + (end - 0.5) / 1.0 * ow;
+        shade += `<rect x="${x1}" y="${oy}" width="${Math.max(x2 - x1, 2)}" height="${oh}" fill="${COLORS.red}" fill-opacity="0.12"/>`;
+        start = null;
+      }
+    });
+    if (shade) ov.insertAdjacentHTML('beforebegin', shade);
+
+    const nFlip = sw.pts.filter(p => p[2]).length;
+    const top = data.rows[0];
+    statTiles($('s-sens'), [
+      { v: fmtNum(data.base) + met.unit, k: '基线指标值' },
+      { v: top.label, k: '最敏感参数（摆幅 ' + fmtNum(top.span) + met.unit + '）' },
+      { v: nFlip ? (nFlip / sw.pts.length * 100).toFixed(0) + '%' : '无',
+        k: '当前 1D 扫描区间内的翻转占比', cls: nFlip ? 'neg' : 'pos' },
+    ]);
+  }
+
   /* 绑定 */
   const bind = (ids, fn) => { ids.forEach(id => $(id).addEventListener('input', fn)); fn(); };
   bind(['c-tiers', 'c-pitch', 'c-rent', 'c-eff', 'c-style', 'c-cool'], panel1);
   bind(['c-int', 'c-surf', 'c-hbm'], panel2);
   bind(['c-wl', 'c-ubo', 'c-uba', 'c-ubb'], panel3);
   bind(['c-ub', 'c-hione', 'c-3df', 'c-lf', 'c-ngpu'], panel4);
+  bind(['c-metric', 'c-perturb', 'c-sweepparam'], panel5);
 })();
 </script>

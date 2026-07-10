@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import streamlit as st
 
+from tau_sim import layer2_circuit as L2
 from tau_sim import params as P
 from tau_sim import style
 from tau_sim import thermal as TH
@@ -28,9 +29,9 @@ st.title("τ Lab — τ Scaling 交互式仿真")
 st.caption("模型与图表复用仓库 tau_sim/（论文验证所用的文献校准参数即默认值）。"
            "浏览器免安装版见 tau_lab.html。")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     ["① 折叠 + 热约束", "② 封装 N²-vs-N", "③ 集群通信（含 DES）",
-     "④ 级联实验 A-D", "⑤ 参数与出处"])
+     "④ 级联实验 A-D", "⑤ 参数与出处", "⑥ 敏感性扫描"])
 
 # ================= Tab 1 折叠 + 热约束 =================
 with tab1:
@@ -233,6 +234,143 @@ with tab4:
             ax.set_yscale("log"); ax.set_xlabel("年")
             ax.set_ylabel("系统有效算力 (相对第 0 年)"); ax.legend()
             st.pyplot(fig); plt.close(fig)
+
+# ================= Tab 6 敏感性扫描 =================
+
+def _attr_param(mod, attr):
+    return (lambda: getattr(mod, attr)), (lambda v: setattr(mod, attr, v))
+
+
+def _ub_o():
+    return (lambda: P.FABRICS["ub_protocol"]["o"],
+            lambda v: (P.FABRICS["ub_protocol"].__setitem__("o", v),
+                       P.FABRICS["ub_hione"].__setitem__("o", v)))
+
+
+def _ub_a():
+    return (lambda: P.FABRICS["ub_protocol"]["alpha_inter"],
+            lambda v: (P.FABRICS["ub_protocol"].__setitem__("alpha_inter", v),
+                       P.FABRICS["ub_hione"].__setitem__("alpha_inter", v)))
+
+
+def _tcp_o():
+    return (lambda: P.FABRICS["legacy_tcp"]["o"],
+            lambda v: P.FABRICS["legacy_tcp"].__setitem__("o", v))
+
+
+SENS_PARAMS = [
+    ("Rent 指数 p", *_attr_param(P, "RENT_P")),
+    ("折叠布局效率", *_attr_param(P, "FOLD_EFFICIENCY")),
+    ("时钟裕量占比", *_attr_param(L2, "SKEW_FRACTION")),
+    ("绕线系数", *_attr_param(L2, "CROSS_DETOUR_COEF")),
+    ("键合电容/焊盘", *_attr_param(P, "HB_CAP_PER_PAD_2UM")),
+    ("层间热阻", *_attr_param(TH, "R_TIER")),
+    ("互连功耗占比", *_attr_param(TH, "WIRE_POWER_FRACTION")),
+    ("存储层功率比", *_attr_param(TH, "MEM_TIER_Q_RATIO")),
+    ("温升预算", *_attr_param(TH, "DT_BUDGET")),
+    ("UB 每消息开销", *_ub_o()),
+    ("UB 跨机延迟 α", *_ub_a()),
+    ("TCP 栈开销", *_tcp_o()),
+]
+
+
+def _crossover_pitch():
+    for p_ in np.arange(0.5, 12.001, 0.1):
+        r = fold("7nm", 2, float(p_))
+        if r.tau_penalty_ps > r.tau_benefit_ps:
+            return float(p_)
+    return 12.0
+
+
+SENS_METRICS = {
+    "2层折叠频率增益 @1.5μm (%)": (
+        lambda: fold("7nm", 2, 1.5).freq_gain * 100,
+        lambda v: v < 0, "增益转负 → 折叠不再划算"),
+    "判据反转点 pitch (μm)": (
+        _crossover_pitch,
+        lambda v: v < 1.5, "反转点低于 Kirin 的 1.5μm 工作点"),
+    "异构折叠可持续频率 (×)": (
+        lambda: TH.sustained(2, "logic-on-memory", "mobile").f_sustained,
+        lambda v: v < 0.9, "低于 0.9 → 不再『近乎无损』"),
+    "MoE @128卡 UB/RDMA 加速 (×)": (
+        lambda: (moe_decode_step(128, "legacy_rdma", 128).t_iter /
+                 moe_decode_step(128, "ub_protocol", 128).t_iter),
+        lambda v: v < 1, "UB 不再占优"),
+    "级联全开加速 @4096卡 (×)": (
+        lambda: (sum(iteration_tau(SystemConfig(4096, fabric="legacy_tcp")).values()) /
+                 sum(iteration_tau(SystemConfig(4096, k_compute=1.6, k_memory=2.5,
+                                                fabric="ub_hione")).values())),
+        lambda v: v < 1, "级联优化无净收益"),
+}
+
+with tab6:
+    c1, c2 = st.columns([1, 3])
+    with c1:
+        mname = st.selectbox("输出指标", list(SENS_METRICS))
+        perturb = st.slider("扰动幅度 ±%", 10, 50, 30, 5) / 100
+        pname = st.selectbox("1D 扫描参数", [p_[0] for p_ in SENS_PARAMS])
+    with c2:
+        mfn, mflip, mdesc = SENS_METRICS[mname]
+        base = mfn()
+
+        rows = []
+        for label, get, set_ in SENS_PARAMS:
+            b = get()
+            set_(b * (1 - perturb)); lo = mfn()
+            set_(b * (1 + perturb)); hi = mfn()
+            set_(b)
+            rows.append((label, lo, hi))
+        rows.sort(key=lambda r: -abs(r[2] - r[1]))
+
+        m = st.columns(3)
+        m[0].metric("基线指标值", f"{base:.3g}")
+        m[1].metric("最敏感参数", rows[0][0])
+        m[2].metric("其摆幅", f"{abs(rows[0][2]-rows[0][1]):.3g}")
+
+        fig, ax = plt.subplots(figsize=(9, 4.6))
+        y = np.arange(len(rows))[::-1]
+        for yi, (label, lo, hi) in zip(y, rows):
+            ax.barh(yi, lo - base, left=base, height=0.6, color=C[0],
+                    alpha=0.85)
+            ax.barh(yi, hi - base, left=base, height=0.6, color=C[2],
+                    alpha=0.85)
+        ax.axvline(base, color=style.MUTED, ls=":", lw=1)
+        ax.set_yticks(y, [r[0] for r in rows], fontsize=9)
+        ax.set_xlabel(mname)
+        ax.set_title(f"龙卷风图：参数 ±{perturb*100:.0f}% 时指标摆动"
+                     f"（蓝 = −扰动，黄 = +扰动）")
+        st.pyplot(fig); plt.close(fig)
+
+        # 1D 扫描
+        _, get, set_ = next(p_ for p_ in SENS_PARAMS if p_[0] == pname)
+        b = get()
+        fs = np.linspace(0.5, 1.5, 31)
+        vs = []
+        for f_ in fs:
+            set_(b * float(f_))
+            vs.append(mfn())
+        set_(b)
+        vs = np.array(vs)
+        flips = np.array([mflip(v) for v in vs])
+
+        fig, ax = plt.subplots(figsize=(9, 3.6))
+        ax.plot(fs, vs, color=C[0])
+        ax.plot([1.0], [base], "o", color=C[0], ms=8)
+        ax.axvline(1.0, color=style.MUTED, ls=":", lw=1)
+        i = 0
+        while i < len(fs):
+            if flips[i]:
+                j = i
+                while j < len(fs) and flips[j]:
+                    j += 1
+                ax.axvspan(fs[i], fs[min(j, len(fs) - 1)], color=C[5],
+                           alpha=0.12)
+                i = j
+            i += 1
+        ax.set_xlabel(f"{pname}（相对基线倍数）")
+        ax.set_ylabel(mname)
+        ax.set_title(f"1D 扫描（红色区 = {mdesc}）")
+        st.pyplot(fig); plt.close(fig)
 
 # ================= Tab 5 参数 =================
 with tab5:

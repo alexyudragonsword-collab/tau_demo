@@ -63,6 +63,7 @@ M._davisCache = {};
 M.davisCdf = function (p) {
   const key = p.toFixed(3);
   if (M._davisCache[key]) return M._davisCache[key];
+  if (Object.keys(M._davisCache).length > 120) M._davisCache = {};
   const nSide = Math.sqrt(M.N_GATES);
   const lMax = Math.floor(2 * nSide) - 1;
   const cdf = new Float64Array(lMax);
@@ -258,6 +259,93 @@ M.iterationTau = function (nGpus, fabName, kComp, kMem, kOther) {
     comm: tComm,
     other: tOther / (kOther || 1),
   };
+};
+
+/* ---------------- 敏感性扫描：参数注册表 + 指标 ---------------- */
+
+M.RENT_P = 0.62;
+M.FOLD_EFF = 0.85;
+
+M.PARAMS = [
+  { id: 'rent', label: 'Rent 指数 p', get: () => M.RENT_P, set: v => M.RENT_P = v },
+  { id: 'eff', label: '折叠布局效率', get: () => M.FOLD_EFF, set: v => M.FOLD_EFF = v },
+  { id: 'skew', label: '时钟裕量占比', get: () => M.SKEW_FRACTION, set: v => M.SKEW_FRACTION = v },
+  { id: 'detour', label: '绕线系数', get: () => M.CROSS_DETOUR_COEF, set: v => M.CROSS_DETOUR_COEF = v },
+  { id: 'hbcap', label: '键合电容/焊盘', get: () => M.HB_CAP_PER_PAD_2UM, set: v => M.HB_CAP_PER_PAD_2UM = v },
+  { id: 'rtier', label: '层间热阻', get: () => M.R_TIER, set: v => M.R_TIER = v },
+  { id: 'wpf', label: '互连功耗占比', get: () => M.WIRE_POWER_FRACTION, set: v => M.WIRE_POWER_FRACTION = v },
+  { id: 'memq', label: '存储层功率比', get: () => M.MEM_TIER_Q_RATIO, set: v => M.MEM_TIER_Q_RATIO = v },
+  { id: 'dtb', label: '温升预算', get: () => M.DT_BUDGET, set: v => M.DT_BUDGET = v },
+  { id: 'ubo', label: 'UB 每消息开销', get: () => M.FABRICS.ub_protocol.o,
+    set: v => { M.FABRICS.ub_protocol.o = v; M.FABRICS.ub_hione.o = v; } },
+  { id: 'uba', label: 'UB 跨机延迟 α', get: () => M.FABRICS.ub_protocol.ae,
+    set: v => { M.FABRICS.ub_protocol.ae = v; M.FABRICS.ub_hione.ae = v; } },
+  { id: 'tcpo', label: 'TCP 栈开销', get: () => M.FABRICS.legacy_tcp.o,
+    set: v => M.FABRICS.legacy_tcp.o = v },
+];
+
+M.crossoverPitch = function () {
+  for (let p = 0.5; p <= 12.001; p += 0.1) {
+    const r = M.fold(2, p, M.RENT_P, M.FOLD_EFF);
+    if (r.penalty > r.benefit) return p;
+  }
+  return 12;
+};
+
+/* 指标: {label, unit, fn, flip(v)→bool 结论翻转, flipDesc} */
+M.METRICS = {
+  m1: { label: '2层折叠频率增益 @1.5μm', unit: '%',
+        fn: () => M.fold(2, 1.5, M.RENT_P, M.FOLD_EFF).freqGain * 100,
+        flip: v => v < 0, flipDesc: '增益转负 → 折叠不再划算' },
+  m2: { label: '判据反转点 pitch', unit: 'μm',
+        fn: () => M.crossoverPitch(),
+        flip: v => v < 1.5, flipDesc: '反转点低于 Kirin 的 1.5μm 工作点' },
+  m3: { label: '2层异构折叠可持续频率（移动）', unit: '×',
+        fn: () => M.sustained(2, 'logic-on-memory', 'mobile',
+                              M.fold(2, 1.5, M.RENT_P, M.FOLD_EFF)).fSustained,
+        flip: v => v < 0.9, flipDesc: '低于 0.9 → 不再"近乎无损"' },
+  m4: { label: 'MoE @128卡 UB 相对 RDMA 加速', unit: '×',
+        fn: () => M.moeStep(128, M.FABRICS.legacy_rdma) /
+                  M.moeStep(128, M.FABRICS.ub_protocol),
+        flip: v => v < 1, flipDesc: 'UB 不再占优' },
+  m5: { label: '级联全开相对基线加速 @4096卡', unit: '×',
+        fn: () => {
+          const s = o => Object.values(o).reduce((a, b) => a + b, 0);
+          return s(M.iterationTau(4096, 'legacy_tcp', 1, 1, 1)) /
+                 s(M.iterationTau(4096, 'ub_hione', 1.6, 2.5, 1));
+        },
+        flip: v => v < 1, flipDesc: '级联优化无净收益' },
+};
+
+/* 龙卷风数据: 每参数 ±s 扰动后的指标值（按摆幅降序） */
+M.tornado = function (metricId, s) {
+  const met = M.METRICS[metricId];
+  const base = met.fn();
+  const rows = M.PARAMS.map(p => {
+    const b = p.get();
+    p.set(b * (1 - s)); const lo = met.fn();
+    p.set(b * (1 + s)); const hi = met.fn();
+    p.set(b);
+    return { label: p.label, lo, hi, span: Math.abs(hi - lo) };
+  });
+  rows.sort((a, b) => b.span - a.span);
+  return { base, rows };
+};
+
+/* 1D 扫描: 参数在 0.5×~1.5× base 上扫 n 点 */
+M.sweep1d = function (metricId, paramId, n) {
+  const met = M.METRICS[metricId];
+  const p = M.PARAMS.find(x => x.id === paramId);
+  const b = p.get();
+  const pts = [];
+  for (let i = 0; i < (n || 31); i++) {
+    const f = 0.5 + i / ((n || 31) - 1);
+    p.set(b * f);
+    const v = met.fn();
+    pts.push([f, v, met.flip(v)]);
+  }
+  p.set(b);
+  return { base: met.fn(), pts };
 };
 
 if (typeof module !== 'undefined') module.exports = M;
