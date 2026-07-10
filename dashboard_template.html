@@ -1,0 +1,347 @@
+<title>τ Scaling 全栈级联仿真验证</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --card-fig: #fcfcfb;
+    --ink: #14181c;
+    --ink2: #4d5560;
+    --muted: #7d8590;
+    --line: #e3e6ea;
+    --accent: #2a78d6;
+    --accent-soft: #e8f1fc;
+    --ok: #0ca30c;
+    --ok-soft: #e9f6e9;
+    --warn: #a06b00;
+    --warn-soft: #fdf3df;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111417; --surface: #1a1e23; --card-fig: #fcfcfb;
+      --ink: #eef1f4; --ink2: #b7bec7; --muted: #848d97;
+      --line: #2b3138; --accent: #5b9be2; --accent-soft: #1c2c40;
+      --ok: #3fbf3f; --ok-soft: #16281a;
+      --warn: #d9a03a; --warn-soft: #2e2413;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111417; --surface: #1a1e23; --card-fig: #fcfcfb;
+    --ink: #eef1f4; --ink2: #b7bec7; --muted: #848d97;
+    --line: #2b3138; --accent: #5b9be2; --accent-soft: #1c2c40;
+    --ok: #3fbf3f; --ok-soft: #16281a;
+    --warn: #d9a03a; --warn-soft: #2e2413;
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f8fa; --surface: #ffffff; --card-fig: #fcfcfb;
+    --ink: #14181c; --ink2: #4d5560; --muted: #7d8590;
+    --line: #e3e6ea; --accent: #2a78d6; --accent-soft: #e8f1fc;
+    --ok: #0ca30c; --ok-soft: #e9f6e9;
+    --warn: #a06b00; --warn-soft: #fdf3df;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB",
+      "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+    line-height: 1.75; font-size: 15.5px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ---------- header ---------- */
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 10px;
+  }
+  h1 {
+    font-size: 30px; line-height: 1.35; margin: 0 0 10px; font-weight: 700;
+    text-wrap: balance;
+  }
+  .subtitle { color: var(--ink2); max-width: 46em; margin: 0 0 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+  .chip {
+    font-family: var(--mono); font-size: 12px; color: var(--ink2);
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 4px; padding: 3px 9px;
+  }
+
+  /* ---------- proposition cards ---------- */
+  .props {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px; margin: 30px 0 8px;
+  }
+  .prop {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 6px; padding: 14px 16px 12px;
+  }
+  .prop-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .prop-id { font-family: var(--mono); font-weight: 700; color: var(--accent); font-size: 13px; }
+  .prop-name { font-weight: 600; font-size: 14px; flex: 1; }
+  .badge {
+    font-size: 11.5px; padding: 1px 8px; border-radius: 999px;
+    background: var(--ok-soft); color: var(--ok); font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.cond { background: var(--warn-soft); color: var(--warn); }
+  .prop-num {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 12.5px; color: var(--ink2); line-height: 1.6;
+  }
+  .prop-num b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 46px; }
+  h2 {
+    font-size: 21px; margin: 0 0 6px; font-weight: 700; text-wrap: balance;
+    padding-top: 10px; border-top: 2px solid var(--ink);
+  }
+  h2 .tag {
+    font-family: var(--mono); font-size: 12px; color: var(--accent);
+    font-weight: 600; letter-spacing: .06em; display: block; margin-bottom: 2px;
+  }
+  h3 { font-size: 16.5px; margin: 26px 0 6px; }
+  p { margin: 8px 0; max-width: 60em; }
+  .lead { color: var(--ink2); }
+  ul { margin: 8px 0; padding-left: 1.3em; max-width: 58em; }
+  li { margin: 4px 0; }
+  li::marker { color: var(--accent); }
+  strong { font-weight: 650; }
+
+  /* ---------- figure card ---------- */
+  figure {
+    margin: 18px 0; background: var(--card-fig);
+    border: 1px solid var(--line); border-radius: 6px; padding: 14px;
+  }
+  figure img { width: 100%; height: auto; display: block; border-radius: 2px; }
+  figcaption {
+    font-size: 12.5px; color: #52514e; margin-top: 10px; line-height: 1.6;
+    font-family: var(--mono);
+  }
+
+  /* ---------- tables ---------- */
+  .tbl-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--line);
+    vertical-align: top; }
+  th { font-size: 12px; letter-spacing: .05em; color: var(--muted);
+    font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .good { color: var(--ok); font-weight: 600; }
+
+  /* ---------- callouts ---------- */
+  .note {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 10px 16px; border-radius: 0 6px 6px 0; margin: 16px 0;
+    max-width: 58em;
+  }
+  .note.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .note p { margin: 4px 0; }
+
+  code, .m {
+    font-family: var(--mono); font-size: .92em; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px;
+  }
+  pre {
+    font-family: var(--mono); font-size: 13px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px;
+    overflow-x: auto; line-height: 1.7;
+  }
+  footer {
+    margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 13px;
+  }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Simulation Study · τ = f(τ<sub>transistor</sub>, τ<sub>circuit</sub>, τ<sub>chip</sub>, τ<sub>system</sub>)</div>
+    <h1>用全栈 τ 级联仿真验证「时间缩放理论」</h1>
+    <p class="subtitle">对何庭波（Huawei）《A Time Scaling Theory for Multi-Layer Electronic Systems》（ChinaXiv:202605.00224）五个核心命题的独立仿真论证。全部模型输入取自独立公开文献；论文自身数据只作对照目标，不进入模型。</p>
+    <div class="meta">
+      <span class="chip">四层级联: 器件 → 电路 → 封装 → 系统</span>
+      <span class="chip">SimPy 离散事件验证</span>
+      <span class="chip">敏感性: 17 项扰动 0 翻转</span>
+      <span class="chip">python run_all.py 可复现</span>
+    </div>
+  </header>
+
+  <div class="props">
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P1</span>
+        <span class="prop-name">几何缩放收益趋平</span>
+        <span class="badge">仿真支持</span></div>
+      <div class="prop-num">互连占级延迟 <b>22% → 72%</b>（28→3nm）<br>级延迟 5nm 后不降反升</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P2</span>
+        <span class="prop-name">LogicFolding 折叠判据</span>
+        <span class="badge">仿真支持</span></div>
+      <div class="prop-num">线长 <b>−24.9%</b>｜偏斜 <b>−24.9%</b>｜频率 <b>+12.3%</b><br>论文实测: −30% / −25% / +13%</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P3</span>
+        <span class="prop-name">N²-vs-N 扇出困境</span>
+        <span class="badge">仿真支持</span></div>
+      <div class="prop-num">2.5D ridge 随规模上移，<b>N≈55mm</b> 后连 GEMM 也访存受限；3D 恒为 40 FLOP/B</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P4</span>
+        <span class="prop-name">UB 通信 τ 压缩 500×</span>
+        <span class="badge cond">分 regime 支持</span></div>
+      <div class="prop-num">小消息: 同物理线换协议栈 <b>9–150×</b><br>大消息: 收益主要来自带宽扁平化</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P5</span>
+        <span class="prop-name">τ 是全栈共享优化目标</span>
+        <span class="badge">仿真涌现</span></div>
+      <div class="prop-num">单层优化饱和于占比倒数；协同 α <b>1.22</b> vs 单点 1.02–1.08；瓶颈按层迁移</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">＋</span>
+        <span class="prop-name">二期: 热约束 &amp; α 口径</span>
+        <span class="badge cond">条件可达</span></div>
+      <div class="prop-num">异构折叠可持续 f≈<b>0.98</b>（同构 0.80）<br>硬件三因子 α≈<b>2.0/年</b>，10× 需模型外因子</div>
+    </div>
+  </div>
+
+  <section id="idea">
+    <h2><span class="tag">§1</span>论文核心思想</h2>
+    <p>论文的中心论点：<strong>摩尔定律的本质从来不是「更小」，而是「更快」</strong>——晶体管缩小之所以有价值，是因为开关更快、信号传播更短、跨越边界更少；空间缩放只是压缩时间的手段。当几何缩放在 7nm 以下失效后，应直接把特征时间常数 <span class="m">τ</span> 作为第一优化目标，在栈的每一层（晶体管 ps → 电路 → 芯片 ns → 系统 s，跨约 12 个数量级）定义并压缩它：</p>
+    <pre>τ = f(τ_transistor, τ_circuit, τ_chip, τ_system)        τ_{n+1} = τ_n / α</pre>
+    <p>α 因应用而异（移动 ~1.3/年，AI 至 10/年）。τ 的独特价值在于<strong>全栈同一量纲</strong>：工艺、电路、系统工程师第一次可以用相同单位讨论同一个量，使跨层协同优化成为可能——这是论文声称的、Dennard 之后第一个全栈共享的优化目标。</p>
+  </section>
+
+  <section id="layer1">
+    <h2><span class="tag">Layer 1 · 器件层</span>P1 — 纯几何缩放趋平</h2>
+    <p class="lead">α-power law（速度饱和）+ 铜互连尺寸效应，FO4 与线阻取自公开文献锚点。</p>
+    <ul>
+      <li>门本征延迟 28nm→3nm 仅改善到 0.40×，速度饱和把收益从平方律压到线性；</li>
+      <li>铜线宽低于电子平均自由程后电阻率飙升：最优中继线延迟从 84 涨到 302 ps/mm；</li>
+      <li>加入固定跨度中间布线后，<strong>级延迟 5nm 后不降反升</strong>，互连占比 22%→72% —— 「晶体管仍在变快，但系统 τ 不再变快」，这正是 τ scaling 的动机。</li>
+    </ul>
+    <figure><img src="{{FIG1}}" alt="图1 几何缩放的 τ 收益逐代衰减与互连占比上升">
+      <figcaption>fig 1 · 左: 理想平方律 / 速度饱和本征 / 含互连级延迟；右: 互连占级延迟比例随节点上升</figcaption></figure>
+  </section>
+
+  <section id="layer2">
+    <h2><span class="tag">Layer 2 · 电路层</span>P2 — LogicFolding 与折叠判据</h2>
+    <p class="lead">Davis 先验线长分布（Rent 定则）+ 最优中继延迟 + 折叠几何；固定 7nm 节点、10⁷ 门处理核、1.5μm 混合键合。</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>指标</th><th>模型 (2 层折叠)</th><th>论文实测 (Kirin 2026)</th><th>备注</th></tr>
+      <tr><td>平均线长降幅</td><td class="num good">−24.9%</td><td class="num">−30%</td><td>理论上限 29.3%，取布局效率 0.85</td></tr>
+      <tr><td>时钟偏斜降幅</td><td class="num good">−24.9%</td><td class="num">−25%</td><td>模型输出（时钟树同比例收缩），非输入</td></tr>
+      <tr><td>关键路径频率</td><td class="num good">+12.3%</td><td class="num">+13%</td><td>252ps → 225ps</td></tr>
+      <tr><td>晶体管密度</td><td class="num">239 MTr/mm²</td><td class="num">238</td><td>⚠ 面积开销经校准，非独立预测</td></tr>
+      <tr><td>4 层折叠（前瞻）</td><td class="num">线长 −42.5% / 频率 +24.8% / 密度 378</td><td class="num">路线图 2031: 400+</td><td>无热约束上限，见热约束节</td></tr>
+    </table></div>
+    <figure><img src="{{FIG3}}" alt="图3 LogicFolding 收益模型与论文实测对比"><figcaption>fig 3 · 模型（独立文献参数）与 Kirin 2026 实测的三项对照</figcaption></figure>
+    <p>论文的折叠判据 <span class="m">τ_Benefit &gt; τ_Penalty</span> 在模型中真实存在：扫描混合键合 pitch，交叉点位于 <strong>≈3.1μm（gear ratio ≈ 4.3，敏感区 3.3–6.2）</strong>。论文的工程结论「gear ratio 应低于 3」落在安全侧，Kirin 的 1.5μm 选择有约 2 倍裕量。</p>
+    <figure><img src="{{FIG2}}" alt="图2 折叠判据 τ_Benefit 与 τ_Penalty 随键合 pitch 的交叉"><figcaption>fig 2 · 判据反转点扫描：pitch 越细收益区间越大，gear ratio ≈ 1 时绕线代价消失</figcaption></figure>
+  </section>
+
+  <section id="layer3">
+    <h2><span class="tag">Layer 3 · 封装层</span>P3 — N²-vs-N 扇出困境</h2>
+    <p class="lead">算力 ∝ N²（面积），2.5D 边缘带宽 ∝ N（周长），3D 表面带宽 ∝ N²；以 H100 级算力/带宽密度锚定，roofline 分析。</p>
+    <ul>
+      <li>访存受限负载的可达算力：2.5D 沿斜率 1、3D 沿斜率 2 —— log-log 图上的发散就是拓扑赤字本身；</li>
+      <li>2.5D 的 ridge 运算强度随边长线性上移，<strong>N≈55mm 后连训练 GEMM（~300 FLOP/B）也变为访存受限</strong>；3D Folding 恒为 ~40 FLOP/B，与规模无关；</li>
+      <li>印证论文判断：「没有任何晶体管级改进能弥补拓扑赤字」——这是纯几何事实。</li>
+    </ul>
+    <figure><img src="{{FIG4}}" alt="图4 N²-vs-N 扇出困境"><figcaption>fig 4 · 左: 可达算力斜率 1 vs 斜率 2；右: ridge 强度随规模上移，与 GEMM/decode 强度线的交叉</figcaption></figure>
+  </section>
+
+  <section id="layer4">
+    <h2><span class="tag">Layer 4 · 系统层</span>P4 — 通信 τ 压缩的兑现 regime</h2>
+    <p class="lead">α-β 集合通信代价模型（Thakur）+ SimPy 离散事件仿真（含链路争用与抖动）交叉验证；fabric 参数取自 OSDI/SIGCOMM 实测与 UB-Mesh/CloudMatrix 公开数据。</p>
+    <ul>
+      <li><strong>大消息 regime</strong>（训练梯度 AllReduce，200GB/迭代）：扩展效率由带宽决定。16384 卡时 TCP 类 7%、RDMA/IB 17%、UB+Hi-ONE 26% —— 500× 的延迟优势在此兑现有限；</li>
+      <li><strong>小消息 regime</strong>（MoE 推理 all-to-all，KB 级）：协议栈 α 完全主导。同一条 400G 物理线，128 卡专家并行每步：TCP ~400ms、RDMA ~24ms、UB 协议 ~2.6ms —— <strong>9×（vs RDMA）至 150×（vs TCP）</strong>；</li>
+      <li>结论：P4 成立但需精确化——低 α 的价值集中在细粒度访问（MoE 路由、内存池化、同步原语），大消息收益来自 UB+Hi-ONE 带宽扁平化。<strong>两者缺一不可，这本身就是跨层协同的例证。</strong></li>
+    </ul>
+    <figure><img src="{{FIG5}}" alt="图5 集群通信扩展效率与 MoE 小消息时延"><figcaption>fig 5 · 左: 训练扩展效率（大消息）；右: MoE all-to-all（小消息），空心方块为 SimPy 事件级验证点</figcaption></figure>
+  </section>
+
+  <section id="cascade">
+    <h2><span class="tag">级联实验</span>P5 — τ 作为全栈共享优化目标</h2>
+    <p class="lead">系统场景：4096 卡、100B 参数 LLM 训练迭代。基线 τ 分解：通信 67% / 计算 20% / 访存 11% / 其他 2%（通信占比与 MegaScale、Domino 的实测区间一致）。</p>
+
+    <h3>实验 A · 单层优化的 Amdahl 饱和</h3>
+    <p>单独把任一层 τ 压缩 100×，系统加速都饱和于该层占比的倒数（通信 3.0×、计算 1.25×、访存 1.13×）。<strong>没有任何单层可以独自延续「每年 α 倍」</strong>。</p>
+    <figure><img src="{{FIG6}}" alt="图6 Amdahl 饱和曲线"><figcaption>fig 6 · 虚线为各层占比决定的加速上限 1/(1−占比)</figcaption></figure>
+
+    <h3>实验 B · 十年演进：单点 vs 全栈协同</h3>
+    <p>只推器件节点 α≈1.02、只换网络 fabric α≈1.08（第 4 年起停滞）、<strong>全栈 τ-first 协同 α≈1.22</strong> —— 只有把每年的改进投给「当年的主导 τ 层」，α 才能十年维持。</p>
+    <figure><img src="{{FIG7}}" alt="图7 十年轨迹对比"><figcaption>fig 7 · 系统 τ（log），固定 4096 卡口径</figcaption></figure>
+
+    <h3>实验 C · 瓶颈迁移</h3>
+    <p>按论文技术路线依次引入优化：<span class="m">通信 → 通信 → 计算 → 计算 → 通信</span>。整链 3.0× 中没有一步孤立起效；每步优化都把主导层推给别人——<strong>「主导 τ 层就是下一个投资方向」在模型中自然涌现</strong>，且瓶颈循环回归（阶段 4 后又该投通信，对应 UB2.0 路线图）。</p>
+    <figure><img src="{{FIG8}}" alt="图8 瓶颈迁移堆叠图"><figcaption>fig 8 · 各阶段迭代 τ 构成与主导层标注</figcaption></figure>
+
+    <h3>实验 D · 论文 AI 侧 α≈10/年 的口径分解</h3>
+    <p>弱扩展 + 模型规模随算力协同增长（Chinchilla 口径）。系统能力 = 集成规模 × 单芯片 × 扩展效率：</p>
+    <ul>
+      <li>fabric 不演进（legacy）：扩展效率 0.47→0.08 坍塌，α_eff=0.84，十年 165×；</li>
+      <li>τ-first（fabric 随算力同步演进）：效率维持（α_eff≈1.02），α_total≈2.0/年，<strong>十年 1064×</strong> —— 与论文「集成 100×/十年」量级呼应；</li>
+      <li><strong>诚实结论</strong>：硬件三因子（1.58×1.25×1.0）≈2.0/年，叠加精度演进 ≈2.6/年；论文 α≈10 还需算法/软件等模型外因子。τ 压缩的真正作用是<strong>让规模增长的收益不被通信吃掉（守住 α_eff≈1）</strong>。</li>
+    </ul>
+    <figure><img src="{{FIG10}}" alt="图10 α 口径分解"><figcaption>fig 10 · 左: 弱扩展十年轨迹；右: α 的因子分解</figcaption></figure>
+  </section>
+
+  <section id="thermal">
+    <h2><span class="tag">二期补充</span>热约束 — 多层折叠的可持续性</h2>
+    <p class="lead">一维热阻网络（减薄硅 0.34 + 键合界面 ~3 K·mm²/W）+ α-power law 功率-频率耦合；温升预算 60K；对应论文开放问题 §6。</p>
+    <ul>
+      <li><strong>热约束的主体是 TDP，不是层间热阻</strong>：折叠使单位面积功率密度翻倍才是主要惩罚，层间梯度只占预算 ≤7%（键合热阻取 10 K·mm²/W 时也仅 18%）；</li>
+      <li>同构「逻辑+逻辑」全功率折叠：2 层可持续频率降至 0.80，4 层 0.60 —— 全功率多层逻辑折叠必须配合供电/散热革新；</li>
+      <li><strong>异构「逻辑+存储」折叠（Kirin 2026 实际形态）2 层可持续 0.98，近乎无损</strong>，同时保有 +12% burst 频率与线电容降低带来的能效收益——解释了为什么论文的落地路径是「逻辑折存储」而非「逻辑折逻辑」，也把 4 层前瞻从「上限」修正为「条件可达」。</li>
+    </ul>
+    <figure><img src="{{FIG9}}" alt="图9 热约束下的可持续频率"><figcaption>fig 9 · 左: 可持续频率 vs 层数（虚线为无热约束电路极限）；右: 温升构成</figcaption></figure>
+  </section>
+
+  <section id="params">
+    <h2><span class="tag">§方法</span>参数校准（独立于被验证论文）</h2>
+    <p>避免循环论证：论文自身数据只作「待复现目标」。模型输入全部取自独立公开文献，节选：</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>参数</th><th>取值</th><th>出处</th></tr>
+      <tr><td>FO4 门延迟 28→3nm</td><td class="num">15 → 6 ps (±30%)</td><td>Harris; Stillmaker &amp; Baas 2017 (PTM)</td></tr>
+      <tr><td>速度饱和指数 α</td><td class="num">1.25</td><td>Sakurai &amp; Newton, IEEE JSSC 1990</td></tr>
+      <tr><td>铜电阻率尺寸效应</td><td class="num">ρ(w)=1.68·(1+40nm/w)</td><td>Steinhögl 实测拟合; imec BEOL</td></tr>
+      <tr><td>先验线长分布 / Rent p</td><td class="num">Davis 闭式 / 0.62</td><td>Davis-De-Meindl, IEEE TED 1998; Bakoglu</td></tr>
+      <tr><td>3D 线长收缩</td><td class="num">1/√k × 效率 0.85</td><td>Rahman &amp; Reif 2000; OpenSPARC T2 案例</td></tr>
+      <tr><td>混合键合 R / C</td><td class="num">0.3Ω / 0.2fF @2μm</td><td>imec ECTC（79.5mΩ 实测）; TSMC SoIC</td></tr>
+      <tr><td>算力/HBM 锚点</td><td class="num">1.2 TF/mm²; 1.2TB/s/栈</td><td>NVIDIA H100 datasheet; Micron HBM3E</td></tr>
+      <tr><td>TCP / RDMA / UB 延迟</td><td class="num">25μs / 1.5μs / 0.15μs</td><td>IX OSDI'14; eRPC NSDI'19; UB-Mesh; CloudMatrix384</td></tr>
+      <tr><td>AllReduce 代价 / 梯度量</td><td class="num">2(n−1)(o+α)+2V(n−1)/nB / 2Ψ</td><td>Thakur IJHPCA 2005; ZeRO SC'20</td></tr>
+      <tr><td>运算强度 GEMM / decode</td><td class="num">300 / 2 FLOP/B</td><td>NVIDIA 矩阵乘指南; Pope et al. 2022</td></tr>
+    </table></div>
+    <p>完整 30+ 项参数表及逐项出处见仓库 <code>tau_sim/params.py</code> 与 <code>REPORT.md</code>。</p>
+  </section>
+
+  <section id="robust">
+    <h2><span class="tag">§稳健性</span>敏感性与局限</h2>
+    <p><strong>敏感性</strong>：17 项关键参数 ±50% 量级扰动（Rent 指数、折叠效率、绕线系数、键合电容/热阻、互连功耗占比、对 UB 不利方向的 fabric 参数等），<strong>结论方向翻转 0 次</strong>：折叠频率增益始终 +7.7%~+19.4%，判据反转点始终高于 Kirin 的 1.5μm，协同 α 始终优于单点，异构折叠始终优于同构。</p>
+    <div class="note warn">
+      <p><strong>诚实保留</strong></p>
+      <p>① 密度 155→238 经面积开销校准，属一致性检验而非独立预测；② 集群模型未含计算-通信重叠，会同比压低通信绝对占比但不改变瓶颈迁移次序；③ UB fabric 参数取自华为自述论文（UB-Mesh/CloudMatrix），暂无独立基准佐证——若实际延迟更高，图 5 差距按比例缩小但 regime 结构不变；④ 论文 α≈10/年 无法仅由硬件因子解释，需叠加精度/算法演进，其口径值得论文更精确界定。</p>
+    </div>
+  </section>
+
+  <section id="verdict">
+    <h2><span class="tag">§结论</span>总评</h2>
+    <p>在独立参数校准下，论文五个核心命题全部获得仿真支持（P4 需按消息 regime 精确化，多层折叠需按散热条件精确化）。最重要的是方法论命题 P5：<strong>单层优化饱和、协同维持 α、主导层迁移指示投资方向——这些不是被「假设进」模型的，而是从四层物理/排队模型的级联中自然涌现的</strong>。这是对 τ scaling 作为一种可操作方法论（而非口号）的最有力佐证。</p>
+    <pre># 复现
+git clone -b claude/paper-analysis-model-scenario-m8lzj0 &lt;repo&gt;
+pip install -r requirements.txt
+python run_all.py        # 生成全部 10 张图
+python sensitivity.py    # 17 项扰动检查</pre>
+  </section>
+
+  <footer>
+    仿真与报告 · 2026-07 · 仓库 alexyudragonsword-collab/tau_demo（分支 claude/paper-analysis-model-scenario-m8lzj0）· 被验证论文 ChinaXiv:202605.00224v1
+  </footer>
+</div>

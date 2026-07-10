@@ -19,7 +19,10 @@ from tau_sim.layer4_system import (train_iteration, moe_decode_step,
                                    simpy_ring_allreduce, simpy_alltoall,
                                    hierarchical_allreduce_t, alltoall_t)
 from tau_sim.cascade import (SystemConfig, amdahl_scan, decade_trajectories,
-                             bottleneck_migration, iteration_tau)
+                             bottleneck_migration, iteration_tau,
+                             alpha_decomposition, ALPHA_SCALE, ALPHA_CHIP,
+                             ALPHA_PRECISION)
+from tau_sim.thermal import scan as thermal_scan
 
 FIGDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figures")
 os.makedirs(FIGDIR, exist_ok=True)
@@ -345,6 +348,112 @@ def fig8_bottleneck():
 
 
 # =====================================================================
+# 图 9 — 热约束: 多层折叠的可持续频率
+# =====================================================================
+
+def fig9_thermal():
+    res = thermal_scan()
+    tiers = [1, 2, 3, 4]
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.5, 4.4))
+
+    combos = [
+        (("logic-on-memory", "mobile"), "逻辑+存储折叠 · 移动无源", C[1]),
+        (("logic-on-memory", "ai"), "逻辑+存储折叠 · AI 液冷", C[0]),
+        (("logic-on-logic", "mobile"), "逻辑+逻辑折叠 · 移动无源", C[2]),
+        (("logic-on-logic", "ai"), "逻辑+逻辑折叠 · AI 液冷", C[5]),
+    ]
+    burst = [r.f_burst for r in res[("logic-on-logic", "mobile")]]
+    ax.plot(tiers, burst, "--", color=style.MUTED,
+            label="电路极限 (Layer 2, 无热约束)")
+    for key, label, col in combos:
+        ax.plot(tiers, [r.f_sustained for r in res[key]], "-o", ms=4,
+                color=col, label=label)
+    ax.axhline(1.0, color=style.BASELINE, lw=0.8)
+    ax.set_xticks(tiers)
+    ax.set_xlabel("折叠层数")
+    ax.set_ylabel("可持续频率 (相对 2D 基线)")
+    ax.set_title("(a) 温升预算内的可持续频率\n逻辑+逻辑全功率折叠受 TDP 惩罚, 异构折叠近乎无损")
+    ax.legend(fontsize=8)
+
+    # (b) ΔT 构成: AI 液冷 · 逻辑+逻辑, 各层数下散热面项 vs 层间梯度
+    key = ("logic-on-logic", "ai")
+    grad = np.array([r.dt_gradient for r in res[key]])
+    hs = 60.0 - grad   # 在可持续点恰用满预算 (1 层除外)
+    hs[0], grad[0] = 60.0, 0.0
+    x = np.arange(len(tiers))
+    ax2.bar(x, hs, 0.55, color=style.SEQ[1], label="散热面热阻项 (TDP 约束)",
+            edgecolor=style.SURFACE, linewidth=2)
+    ax2.bar(x, grad, 0.55, bottom=hs, color=C[5],
+            label="层间热阻梯度 (硅+键合界面)", edgecolor=style.SURFACE,
+            linewidth=2)
+    for xi, g in zip(x, grad):
+        if g > 0:
+            ax2.text(xi, 61.5, f"梯度 {g:.1f}K", ha="center", fontsize=8.5,
+                     color=style.INK2)
+    ax2.set_xticks(x, [f"{k}层" for k in tiers])
+    ax2.set_ylim(0, 70)
+    ax2.set_ylabel("温升构成 (K, 预算 60K)")
+    ax2.set_title("(b) 温升构成 (AI·逻辑+逻辑)\n瓶颈是折叠后的功率密度, 层间热阻是次要项")
+    ax2.legend(fontsize=8.5, loc="lower right")
+    fig.suptitle("热约束 · 多层折叠的可持续性（对应论文开放问题 §6）", y=1.04)
+    save(fig, "fig9_thermal_constraint.png")
+    return res
+
+
+# =====================================================================
+# 图 10 — 实验 D: α≈10/年 的口径分解
+# =====================================================================
+
+def fig10_alpha():
+    d = alpha_decomposition()
+    years = d["years"]
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.5, 4.4))
+
+    cols = {"legacy": C[5], "tau_first": C[1]}
+    labels = {"legacy": "legacy fabric 固定 (RDMA/IB)",
+              "tau_first": "τ-first: fabric 随算力同步演进"}
+    for strat in ["legacy", "tau_first"]:
+        r = d[strat]
+        ax.plot(years, r["capability"], "-o", ms=4, color=cols[strat],
+                label=labels[strat])
+        ax.text(years[-1] + 0.15, r["capability"][-1],
+                f"α≈{r['alpha_total']:.2f}/年\n({r['capability'][-1]:.0f}×/十年)",
+                fontsize=8.5, color=cols[strat], va="center")
+    ax.set_yscale("log")
+    ax.set_xlim(0, 12.6)
+    ax.set_xlabel("年")
+    ax.set_ylabel("系统有效算力 (相对第 0 年, log)")
+    ax.set_title("(a) 弱扩展十年轨迹：模型规模随算力增长\nfabric 不演进则扩展效率坍塌 (0.47→0.08)")
+    ax.legend(fontsize=8.5, loc="upper left")
+
+    # (b) α_total 因子分解（对数堆叠 → 用乘法瀑布式条形）
+    factors = [
+        ("集成规模\nα_scale", ALPHA_SCALE, style.SEQ[1]),
+        ("单芯片\nα_chip", ALPHA_CHIP, style.SEQ[2]),
+        ("扩展效率 α_eff\n(τ-first)", d["tau_first"]["alpha_eff"], C[1]),
+        ("扩展效率 α_eff\n(legacy)", d["legacy"]["alpha_eff"], C[5]),
+        ("精度/数制\n(模型外)", ALPHA_PRECISION, style.MUTED),
+    ]
+    x = np.arange(len(factors))
+    vals = [f[1] for f in factors]
+    ax2.bar(x, vals, 0.55, color=[f[2] for f in factors])
+    for xi, v in zip(x, vals):
+        ax2.text(xi, v + 0.02, f"{v:.2f}×", ha="center", fontsize=9,
+                 color=style.INK2)
+    ax2.axhline(1.0, color=style.BASELINE, lw=0.8)
+    prod_tau = ALPHA_SCALE * ALPHA_CHIP * d["tau_first"]["alpha_eff"]
+    prod_all = prod_tau * ALPHA_PRECISION
+    ax2.set_xticks(x, [f[0] for f in factors], fontsize=8)
+    ax2.set_ylim(0, 1.85)
+    ax2.set_ylabel("年化倍率")
+    ax2.set_title(f"(b) α 的因子分解: 硬件三因子积 ≈ {prod_tau:.1f}×/年\n"
+                  f"叠加精度演进 ≈ {prod_all:.1f}×/年 — 论文 α≈10 还需算法/软件因子")
+    fig.suptitle("级联实验 D · 论文 AI 侧 α 的口径分解（论文 §2）", y=1.04)
+    save(fig, "fig10_alpha_decomposition.png")
+    return d
+
+
+# =====================================================================
 # 控制台摘要
 # =====================================================================
 
@@ -380,5 +489,14 @@ if __name__ == "__main__":
     fig6_amdahl()
     fig7_decade()
     stages = fig8_bottleneck()
+    print("热约束 ...")
+    thermal = fig9_thermal()
+    print("级联实验 D / α 分解 ...")
+    alpha = fig10_alpha()
     summary(fold2, stages)
+    r2m = thermal[("logic-on-memory", "mobile")][1]
+    print(f"  热约束     2层异构折叠可持续 f={r2m.f_sustained:.2f}, "
+          f"burst=+{(r2m.f_burst-1)*100:.0f}%")
+    print(f"  α 口径     τ-first {alpha['tau_first']['alpha_total']:.2f}/年 "
+          f"vs legacy {alpha['legacy']['alpha_total']:.2f}/年")
     print("\n全部图表已输出到 figures/")

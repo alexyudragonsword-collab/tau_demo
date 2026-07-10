@@ -27,6 +27,8 @@ python sensitivity.py   # 关键参数 ±50% 扰动的稳健性检查
 | P3 2.5D ridge 上移 | N≈55mm 后 GEMM 也访存受限 | "拓扑赤字无法靠晶体管弥补" |
 | P4 小消息 all-to-all | 同物理线换协议栈 9–150× | UB ≈500× τ 压缩 |
 | P5 十年年化 α | 协同 1.22 vs 单点 1.02–1.08 | τ_{n+1}=τ_n/α 需跨层协同 |
+| 热约束（二期） | 异构折叠可持续 f≈0.98，同构 0.80 | 论文开放问题 §6；AMD X3D 佐证 |
+| α≈10/年口径（二期） | 硬件三因子 ≈2.0/年，效率坍塌时仅 1.67 | τ 压缩的作用是守住 α_eff≈1 |
 
 ## 目录结构
 
@@ -37,9 +39,11 @@ tau_sim/
 ├── layer2_circuit.py  # 电路层：Davis 线长分布 + LogicFolding
 ├── layer3_chip.py     # 封装层：N²-vs-N + roofline
 ├── layer4_system.py   # 系统层：α-β 集合通信 + SimPy 离散事件仿真
-└── cascade.py         # 级联：Amdahl 饱和 / 十年轨迹 / 瓶颈迁移
-run_all.py             # 一键运行全部实验
-sensitivity.py         # 敏感性检查
+├── thermal.py         # 热约束：多层折叠可持续频率
+└── cascade.py         # 级联：Amdahl / 十年轨迹 / 瓶颈迁移 / α 分解
+run_all.py             # 一键运行全部实验 (fig1-fig10)
+sensitivity.py         # 敏感性检查（17 项扰动）
+build_dashboard.py     # 生成自包含可视化页面 dashboard.html
 figures/               # 仿真输出图表
 REPORT.md              # 完整分析报告（论文解读 + 结果 + 局限）
 ```

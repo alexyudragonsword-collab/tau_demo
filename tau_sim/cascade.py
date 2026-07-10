@@ -13,6 +13,9 @@
 实验 C（瓶颈迁移）：按论文叙事依次引入 UB 协议 → Hi-ONE 光带宽 →
     3D Folding 内存 → LogicFolding 算力，展示主导 τ 层迁移
     ——“主导 τ 层就是下一个投资方向”。
+实验 D（α≈10/年口径分解）：系统能力 = 集成规模 × 单芯片 × 扩展效率，
+    弱扩展 + 模型规模随算力协同增长 (Chinchilla)，分解论文 AI 侧
+    α 的来源，并检验 τ-first 与 legacy fabric 下 α_eff 的差异。
 """
 
 from dataclasses import dataclass, replace
@@ -159,6 +162,68 @@ def decade_trajectories(years: int = 10, n_gpus: int = 4096) -> dict:
 # ---------------------------------------------------------------------
 # 实验 C — 瓶颈迁移
 # ---------------------------------------------------------------------
+
+# ---------------------------------------------------------------------
+# 实验 D — α≈10/年 的口径分解
+# ---------------------------------------------------------------------
+
+# 年化增长假设（均独立于被验证论文的 α 数值本身）
+ALPHA_SCALE = 1.58        # 集成规模: 论文路线图 >100×/十年 的等效年率
+ALPHA_CHIP = 1.25         # 单芯片有效算力: 器件 ~15% + 折叠/架构 (一期实验 B)
+ALPHA_PRECISION = 1.30    # 精度/数制演进 (FP16→FP8→FP4, ~2×/2-3年) —
+                          # 模型外因子, 仅用于口径对齐展示
+N0_CHIPS = 512
+TOKENS_PER_GPU = 1024     # 弱扩展: 每卡批量固定
+MODEL_GROWTH = (ALPHA_SCALE * ALPHA_CHIP) ** 0.5   # Chinchilla: 参数 ∝ √算力
+
+
+def _weak_scaling_eff(n_gpus: int, model_params: float, fabric: dict,
+                      k_comm: float = 1.0, per_chip: float = 1.0) -> float:
+    """弱扩展效率 = t_comp / (t_comp + t_comm)。"""
+    t_comp = (6.0 * model_params * TOKENS_PER_GPU /
+              (per_chip * P.PER_GPU_TFLOPS_EFF * 1e12))
+    vol = model_params * P.BYTES_PER_PARAM
+    t_comm = hierarchical_allreduce_t(int(n_gpus), vol, fabric) / k_comm
+    return t_comp / (t_comp + t_comm)
+
+
+def alpha_decomposition(years: int = 10) -> dict:
+    """两种 fabric 策略下的十年系统能力轨迹与 α 因子分解。
+
+    能力 capability(y) = N_chips(y) · per_chip(y) · eff(y)   (相对值)
+    其中 eff 由 Layer 4 通信模型给出；模型规模随总算力按
+    Chinchilla 口径增长, 使通信量逐年上升 —— fabric 不升级则
+    α_eff < 1（规模增长的收益被通信吃掉）。
+    """
+    out = {"years": np.arange(years + 1)}
+    for strat in ["legacy", "tau_first"]:
+        caps, effs = [], []
+        for y in range(years + 1):
+            n = N0_CHIPS * ALPHA_SCALE ** y
+            per_chip = ALPHA_CHIP ** y
+            model_p = P.MODEL_PARAMS * MODEL_GROWTH ** y
+            if strat == "legacy":
+                fab, k_comm = P.FABRICS["legacy_rdma"], 1.0
+            else:
+                if y < 3:
+                    fab, k_comm = P.FABRICS["legacy_rdma"], 1.0
+                elif y < 4:
+                    fab, k_comm = P.FABRICS["ub_protocol"], 1.0
+                else:   # Hi-ONE 之后 fabric 带宽随代际持续演进
+                    # (论文口径: 互连集成与算力同步增长)
+                    fab, k_comm = P.FABRICS["ub_hione"], 1.4 ** (y - 4)
+            eff = _weak_scaling_eff(n, model_p, fab, k_comm, per_chip)
+            effs.append(eff)
+            caps.append(n * per_chip * eff)
+        caps, effs = np.array(caps), np.array(effs)
+        out[strat] = {
+            "capability": caps / caps[0],
+            "eff": effs,
+            "alpha_total": (caps[-1] / caps[0]) ** (1.0 / years),
+            "alpha_eff": (effs[-1] / effs[0]) ** (1.0 / years),
+        }
+    return out
+
 
 def bottleneck_migration(n_gpus: int = 4096) -> list[tuple[str, dict]]:
     """论文叙事顺序的五个阶段，返回各阶段 τ 分量。"""
