@@ -14,9 +14,20 @@ P5 全栈共享优化目标与瓶颈迁移）。
 
 ```bash
 pip install -r requirements.txt
-python run_all.py       # 生成 figures/fig1-fig8 + 控制台对照表
-python sensitivity.py   # 关键参数 ±50% 扰动的稳健性检查
+python run_all.py       # 生成 figures/fig1-fig10 + 控制台对照表
+python sensitivity.py   # 关键参数 ±50% 扰动的稳健性检查（17 项）
 ```
+
+## 交互式 GUI（两个版本）
+
+```bash
+streamlit run app.py    # 本地完整版：五个 tab，复用 tau_sim 全部模型（含 SimPy DES 验证按钮）
+python build_tau_lab.py # 生成 tau_lab.html：浏览器免安装版（模型 JS 移植，
+                        # 与 Python 基线 14 项指标对拍误差 0），直接双击打开
+```
+
+浏览器版四个面板：折叠实验台（判据交叉 + 热约束）、封装 N²-vs-N、
+集群通信（大/小消息 regime，UB 参数可压力测试）、级联瓶颈迁移 + Amdahl。
 
 ## 结果速览（模型输入全部来自独立公开文献）
 

@@ -1,0 +1,481 @@
+<title>τ Lab — 交互式仿真</title>
+<style>
+  :root {
+    --bg:#f7f8fa; --surface:#ffffff; --card-fig:#fcfcfb;
+    --ink:#14181c; --ink2:#4d5560; --muted:#7d8590; --line:#e3e6ea;
+    --accent:#2a78d6; --accent-soft:#e8f1fc;
+    --mono: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg:#111417; --surface:#1a1e23; --card-fig:#fcfcfb;
+    --ink:#eef1f4; --ink2:#b7bec7; --muted:#848d97; --line:#2b3138;
+    --accent:#5b9be2; --accent-soft:#1c2c40; } }
+  :root[data-theme="dark"] {
+    --bg:#111417; --surface:#1a1e23; --card-fig:#fcfcfb;
+    --ink:#eef1f4; --ink2:#b7bec7; --muted:#848d97; --line:#2b3138;
+    --accent:#5b9be2; --accent-soft:#1c2c40; }
+  :root[data-theme="light"] {
+    --bg:#f7f8fa; --surface:#ffffff; --card-fig:#fcfcfb;
+    --ink:#14181c; --ink2:#4d5560; --muted:#7d8590; --line:#e3e6ea;
+    --accent:#2a78d6; --accent-soft:#e8f1fc; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC","Segoe UI",sans-serif;
+    font-size:15px; line-height:1.7; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1060px; margin:0 auto; padding:36px 24px 80px; }
+  .eyebrow { font-family:var(--mono); font-size:12px; letter-spacing:.14em;
+    color:var(--accent); text-transform:uppercase; margin-bottom:8px; }
+  h1 { font-size:27px; margin:0 0 8px; font-weight:700; }
+  .subtitle { color:var(--ink2); max-width:52em; margin:0; }
+  section { margin-top:44px; }
+  h2 { font-size:19px; margin:0 0 4px; font-weight:700;
+    padding-top:10px; border-top:2px solid var(--ink); }
+  h2 .tag { font-family:var(--mono); font-size:11.5px; color:var(--accent);
+    font-weight:600; letter-spacing:.06em; display:block; }
+  .desc { color:var(--ink2); font-size:13.5px; margin:2px 0 14px; max-width:56em; }
+
+  .panel { display:grid; grid-template-columns:250px 1fr; gap:18px; align-items:start; }
+  @media (max-width:760px){ .panel { grid-template-columns:1fr; } }
+  .controls { background:var(--surface); border:1px solid var(--line);
+    border-radius:6px; padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
+  .ctl label { display:flex; justify-content:space-between; font-size:12.5px;
+    color:var(--ink2); margin-bottom:2px; }
+  .ctl label b { font-family:var(--mono); color:var(--ink); font-weight:600;
+    font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; accent-color:var(--accent); margin:0; }
+  select { width:100%; font:inherit; font-size:13px; color:var(--ink);
+    background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
+  .toggle { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
+  .toggle input { accent-color:var(--accent); width:15px; height:15px; }
+
+  .charts { display:flex; flex-direction:column; gap:14px; min-width:0; }
+  .fig { background:var(--card-fig); border:1px solid var(--line);
+    border-radius:6px; padding:10px 12px 6px; position:relative; }
+  .fig h4 { margin:0 0 2px; font-size:12.5px; color:#52514e; font-weight:600; }
+  .fig svg { width:100%; height:auto; display:block; }
+
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; }
+  .stat { background:var(--surface); border:1px solid var(--line); border-radius:6px;
+    padding:8px 12px; }
+  .stat .v { font-family:var(--mono); font-size:19px; font-weight:600;
+    font-variant-numeric:tabular-nums; }
+  .stat .k { font-size:11.5px; color:var(--muted); line-height:1.4; }
+  .stat .v.pos { color:#008300; } .stat .v.neg { color:#c43c3c; }
+
+  #tip { position:fixed; pointer-events:none; z-index:10; display:none;
+    background:var(--ink); color:var(--bg); font-family:var(--mono); font-size:11.5px;
+    padding:5px 9px; border-radius:4px; white-space:pre; line-height:1.5; }
+  footer { margin-top:56px; padding-top:16px; border-top:1px solid var(--line);
+    color:var(--muted); font-size:12.5px; }
+  a { color:var(--accent); }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">τ Lab · Interactive Simulation</div>
+    <h1>τ Scaling 交互式仿真实验台</h1>
+    <p class="subtitle">拖动参数，实时重算四层级联模型。模型与仓库
+    <span style="font-family:var(--mono)">tau_sim/</span> Python 实现逐位对拍一致（14 项指标误差 0）；
+    参数默认值即论文验证所用的文献校准值。</p>
+  </header>
+
+  <!-- ============ Panel 1 折叠实验台 ============ -->
+  <section>
+    <h2><span class="tag">Layer 2 + 热约束</span>LogicFolding 折叠实验台</h2>
+    <p class="desc">判据 τ_Benefit &gt; τ_Penalty 决定折叠是否划算；热约束决定收益是否可持续。虚线竖标 = 当前键合 pitch 工作点。</p>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label>折叠层数 <b id="v-tiers">2</b></label>
+          <input type="range" id="c-tiers" min="2" max="4" step="1" value="2"></div>
+        <div class="ctl"><label>混合键合 pitch (μm) <b id="v-pitch">1.5</b></label>
+          <input type="range" id="c-pitch" min="0.5" max="6" step="0.1" value="1.5"></div>
+        <div class="ctl"><label>Rent 指数 p <b id="v-rent">0.62</b></label>
+          <input type="range" id="c-rent" min="0.50" max="0.75" step="0.01" value="0.62"></div>
+        <div class="ctl"><label>折叠布局效率 <b id="v-eff">0.85</b></label>
+          <input type="range" id="c-eff" min="0.60" max="1.00" step="0.05" value="0.85"></div>
+        <div class="ctl"><label>折叠形态</label>
+          <select id="c-style">
+            <option value="logic-on-memory">逻辑 + 存储（Kirin 形态）</option>
+            <option value="logic-on-logic">逻辑 + 逻辑（全功率）</option>
+          </select></div>
+        <div class="ctl"><label>散热场景</label>
+          <select id="c-cool">
+            <option value="mobile">移动 · 无源</option>
+            <option value="ai">AI · 液冷</option>
+          </select></div>
+      </div>
+      <div class="charts">
+        <div class="stats" id="s-fold"></div>
+        <div class="fig"><h4>折叠判据：τ_Benefit vs τ_Penalty 随键合 pitch（ps）</h4><div id="ch-criterion"></div></div>
+        <div class="fig"><h4>频率：电路极限 (burst) vs 热约束下可持续（相对 2D = 1）</h4><div id="ch-freq"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Panel 2 封装 ============ -->
+  <section>
+    <h2><span class="tag">Layer 3</span>封装 N²-vs-N 扇出困境</h2>
+    <p class="desc">算力 ∝ N²，2.5D 边缘带宽 ∝ N，3D 表面带宽 ∝ N²。可达算力 = min(峰值, 强度 × 带宽)。</p>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label>负载运算强度 (FLOP/B) <b id="v-int">2</b></label>
+          <input type="range" id="c-int" min="0" max="3" step="0.05" value="0.301"></div>
+        <div class="ctl"><label>3D 表面带宽密度 (TB/s/mm²) <b id="v-surf">0.03</b></label>
+          <input type="range" id="c-surf" min="0.01" max="0.10" step="0.005" value="0.03"></div>
+        <div class="ctl"><label>HBM 每栈带宽 (TB/s) <b id="v-hbm">1.2</b></label>
+          <input type="range" id="c-hbm" min="0.8" max="2.4" step="0.1" value="1.2"></div>
+      </div>
+      <div class="charts">
+        <div class="stats" id="s-pkg"></div>
+        <div class="fig"><h4>可达算力 vs die/封装等效边长（log-log，TFLOPS）</h4><div id="ch-pkg"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Panel 3 集群通信 ============ -->
+  <section>
+    <h2><span class="tag">Layer 4</span>集群通信 τ</h2>
+    <p class="desc">大消息（训练梯度 AllReduce）看带宽，小消息（MoE all-to-all）看协议栈 α——UB 的 500× 延迟压缩在小消息 regime 兑现。可微调 UB 参数做压力测试。</p>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label>负载</label>
+          <select id="c-wl">
+            <option value="train">训练梯度 AllReduce（大消息）</option>
+            <option value="moe">MoE decode all-to-all（小消息）</option>
+          </select></div>
+        <div class="ctl"><label>UB 每消息开销 o (ns) <b id="v-ubo">50</b></label>
+          <input type="range" id="c-ubo" min="20" max="1500" step="10" value="50"></div>
+        <div class="ctl"><label>UB 跨机延迟 α (ns) <b id="v-uba">300</b></label>
+          <input type="range" id="c-uba" min="100" max="3000" step="50" value="300"></div>
+        <div class="ctl"><label>UB+HiONE 带宽 (GB/s) <b id="v-ubb">392</b></label>
+          <input type="range" id="c-ubb" min="50" max="800" step="10" value="392"></div>
+      </div>
+      <div class="charts">
+        <div class="stats" id="s-net"></div>
+        <div class="fig"><h4 id="t-net">训练扩展效率 vs 集群规模</h4><div id="ch-net"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Panel 4 级联 ============ -->
+  <section>
+    <h2><span class="tag">级联</span>瓶颈迁移与 Amdahl 上限</h2>
+    <p class="desc">开关各项技术，观察 4096 卡训练迭代 τ 的构成变化——主导 τ 层就是下一个投资方向。下图为当前配置下"只加速单层"的 Amdahl 饱和曲线。</p>
+    <div class="panel">
+      <div class="controls">
+        <label class="toggle"><input type="checkbox" id="c-ub"> UB 内存语义协议</label>
+        <label class="toggle"><input type="checkbox" id="c-hione"> Hi-ONE 光互连带宽</label>
+        <label class="toggle"><input type="checkbox" id="c-3df"> 3D Folding 供内存 (×2.5)</label>
+        <label class="toggle"><input type="checkbox" id="c-lf"> LogicFolding 提算力 (×1.6)</label>
+        <div class="ctl" style="margin-top:6px"><label>集群规模 <b id="v-ngpu">4096</b></label>
+          <input type="range" id="c-ngpu" min="9" max="14" step="1" value="12"></div>
+      </div>
+      <div class="charts">
+        <div class="stats" id="s-cas"></div>
+        <div class="fig"><h4>迭代 τ 构成：基线（传统协议栈） vs 当前配置（秒）</h4><div id="ch-stack"></div></div>
+        <div class="fig"><h4>当前配置下的单层 Amdahl 饱和（系统加速 vs 单层压缩倍数）</h4><div id="ch-amdahl"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>τ Lab · 模型与参数出处见仓库 tau_sim/params.py 与 REPORT.md · 静态报告页为另一 Artifact「τ Scaling 全栈级联仿真验证」</footer>
+</div>
+<div id="tip"></div>
+
+<script>
+{{MODEL_JS}}
+</script>
+<script>
+(function () {
+  const M = window.TauModel;
+  const COLORS = { blue:'#2a78d6', aqua:'#1baf7a', yellow:'#eda100', green:'#008300',
+    violet:'#4a3aa7', red:'#e34948', muted:'#898781', grid:'#e1e0d9', ink:'#52514e' };
+  const $ = (id) => document.getElementById(id);
+  const tip = $('tip');
+
+  /* ---------- 极简 SVG 折线图（悬停 tooltip + 图例 + 竖标） ---------- */
+  function lineChart(el, cfg) {
+    const W = 720, H = 240, L = 56, R = 12, T = 26, B = 34;
+    const xs = cfg.series.flatMap(s => s.pts.map(p => p[0]));
+    const ys = cfg.series.flatMap(s => s.pts.map(p => p[1]));
+    const xf = cfg.xLog ? Math.log10 : (v) => v, yf = cfg.yLog ? Math.log10 : (v) => v;
+    let x0 = Math.min(...xs.map(xf)), x1 = Math.max(...xs.map(xf));
+    let y0 = Math.min(...ys.map(yf)), y1 = Math.max(...ys.map(yf));
+    if (cfg.yMin !== undefined) y0 = yf(cfg.yMin);
+    if (y1 === y0) y1 = y0 + 1;
+    const pad = (y1 - y0) * 0.08; y0 -= cfg.yMin !== undefined ? 0 : pad; y1 += pad;
+    const px = (v) => L + (xf(v) - x0) / (x1 - x0) * (W - L - R);
+    const py = (v) => T + (1 - (yf(v) - y0) / (y1 - y0)) * (H - T - B);
+    let g = '';
+    const yt = 4;
+    for (let i = 0; i <= yt; i++) {
+      const v = y0 + (y1 - y0) * i / yt, y = T + (1 - i / yt) * (H - T - B);
+      const lab = cfg.yLog ? fmtNum(Math.pow(10, v)) : fmtNum(v);
+      g += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="${COLORS.grid}" stroke-width="0.7"/>`;
+      g += `<text x="${L - 6}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#898781">${lab}</text>`;
+    }
+    const xt = 5;
+    for (let i = 0; i <= xt; i++) {
+      const v = x0 + (x1 - x0) * i / xt, x = L + i / xt * (W - L - R);
+      const lab = cfg.xLog ? fmtNum(Math.pow(10, v)) : fmtNum(v);
+      g += `<text x="${x}" y="${H - B + 16}" text-anchor="middle" font-size="10" fill="#898781">${lab}</text>`;
+    }
+    if (cfg.markX !== undefined)
+      g += `<line x1="${px(cfg.markX)}" y1="${T}" x2="${px(cfg.markX)}" y2="${H - B}" stroke="#898781" stroke-width="1" stroke-dasharray="3 3"/>`;
+    let paths = '', legend = '';
+    cfg.series.forEach((s, i) => {
+      const d = s.pts.map((p, j) => (j ? 'L' : 'M') + px(p[0]).toFixed(1) + ' ' + py(p[1]).toFixed(1)).join('');
+      paths += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"${s.dash ? ' stroke-dasharray="5 4"' : ''}/>`;
+      legend += `<g transform="translate(${L + i * 0 },0)"></g>`;
+    });
+    let lx = L;
+    cfg.series.forEach(s => {
+      legend += `<line x1="${lx}" y1="12" x2="${lx + 16}" y2="12" stroke="${s.color}" stroke-width="2.5"${s.dash ? ' stroke-dasharray="5 4"' : ''}/>`;
+      legend += `<text x="${lx + 20}" y="15.5" font-size="10.5" fill="#52514e">${s.name}</text>`;
+      lx += 26 + s.name.length * 10.5;
+    });
+    g += `<text x="${(L + W - R) / 2}" y="${H - 4}" text-anchor="middle" font-size="10.5" fill="#52514e">${cfg.xLabel || ''}</text>`;
+    g += `<text x="12" y="${(T + H - B) / 2}" font-size="10.5" fill="#52514e" transform="rotate(-90 12 ${(T + H - B) / 2})" text-anchor="middle">${cfg.yLabel || ''}</text>`;
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img">${g}${paths}${legend}<rect id="ov" x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/></svg>`;
+    const svg = el.querySelector('svg'), ov = el.querySelector('#ov');
+    ov.addEventListener('mousemove', (e) => {
+      const r = svg.getBoundingClientRect();
+      const mx = (e.clientX - r.left) / r.width * W;
+      const vx = x0 + (mx - L) / (W - L - R) * (x1 - x0);
+      let lines = [(cfg.xLabel || 'x') + ': ' + fmtNum(cfg.xLog ? Math.pow(10, vx) : vx)];
+      cfg.series.forEach(s => {
+        let best = s.pts[0], bd = Infinity;
+        s.pts.forEach(p => { const d = Math.abs(xf(p[0]) - vx); if (d < bd) { bd = d; best = p; } });
+        lines.push(s.name + ': ' + fmtNum(best[1]));
+      });
+      tip.textContent = lines.join('\n');
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top = (e.clientY + 12) + 'px';
+    });
+    ov.addEventListener('mouseleave', () => tip.style.display = 'none');
+  }
+
+  function fmtNum(v) {
+    if (!isFinite(v)) return '—';
+    const a = Math.abs(v);
+    if (a >= 1e4 || (a < 1e-2 && a > 0)) return v.toExponential(1).replace('e+', 'e');
+    if (a >= 100) return v.toFixed(0);
+    if (a >= 1) return v.toFixed(2).replace(/\.?0+$/, '');
+    return v.toPrecision(2);
+  }
+
+  /* 水平堆叠条（两根：基线 vs 当前） */
+  function stackChart(el, rows, colors, names) {
+    const W = 720, H = 150, L = 120, R = 70, T = 14, GAP = 18, BH = 34;
+    const max = Math.max(...rows.map(r => r.vals.reduce((a, b) => a + b, 0)));
+    let g = '';
+    rows.forEach((row, ri) => {
+      const y = T + ri * (BH + GAP);
+      let x = L;
+      g += `<text x="${L - 8}" y="${y + BH / 2 + 4}" text-anchor="end" font-size="11.5" fill="#52514e">${row.label}</text>`;
+      row.vals.forEach((v, i) => {
+        const w = v / max * (W - L - R);
+        if (w > 0.5) g += `<rect x="${x}" y="${y}" width="${Math.max(w - 2, 1)}" height="${BH}" rx="2" fill="${colors[i]}"><title>${names[i]}: ${v.toFixed(2)}s</title></rect>`;
+        x += w;
+      });
+      const tot = row.vals.reduce((a, b) => a + b, 0);
+      g += `<text x="${x + 6}" y="${y + BH / 2 + 4}" font-size="11.5" font-weight="600" fill="#14181c" class="totlab">${tot.toFixed(2)}s</text>`;
+    });
+    let lx = L;
+    const ly = T + rows.length * (BH + GAP) + 4;
+    names.forEach((n, i) => {
+      g += `<rect x="${lx}" y="${ly}" width="10" height="10" rx="2" fill="${colors[i]}"/>`;
+      g += `<text x="${lx + 14}" y="${ly + 9}" font-size="10.5" fill="#52514e">${n}</text>`;
+      lx += 30 + n.length * 10.5;
+    });
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${ly + 24}">${g}</svg>`;
+  }
+
+  function statTiles(el, items) {
+    el.innerHTML = items.map(i =>
+      `<div class="stat"><div class="v${i.cls ? ' ' + i.cls : ''}">${i.v}</div><div class="k">${i.k}</div></div>`).join('');
+  }
+
+  /* ================= Panel 1 ================= */
+  function panel1() {
+    const tiers = +$('c-tiers').value, pitch = +$('c-pitch').value;
+    const rent = +$('c-rent').value, eff = +$('c-eff').value;
+    const style = $('c-style').value, cool = $('c-cool').value;
+    $('v-tiers').textContent = tiers; $('v-pitch').textContent = pitch.toFixed(1);
+    $('v-rent').textContent = rent.toFixed(2); $('v-eff').textContent = eff.toFixed(2);
+
+    const f = M.fold(tiers, pitch, rent, eff);
+    const th = M.sustained(tiers, style, cool, f);
+
+    const ben = [], pen = [];
+    for (let p = 0.5; p <= 6.001; p += 0.14) {
+      const r = M.fold(tiers, p, rent, eff);
+      ben.push([p, r.benefit]); pen.push([p, r.penalty]);
+    }
+    lineChart($('ch-criterion'), {
+      series: [
+        { name: 'τ_Benefit 收益', color: COLORS.aqua, pts: ben },
+        { name: 'τ_Penalty 代价', color: COLORS.red, pts: pen }],
+      xLabel: '混合键合 pitch (μm)', yLabel: 'ps', markX: pitch, yMin: 0,
+    });
+
+    const bs = [], ss = [];
+    for (let k = 1; k <= 4; k++) {
+      const fk = M.fold(Math.max(k, 2), pitch, rent, eff);
+      const tk = M.sustained(k, style, cool, fk);
+      bs.push([k, k === 1 ? 1 : 1 + fk.freqGain]); ss.push([k, tk.fSustained]);
+    }
+    lineChart($('ch-freq'), {
+      series: [
+        { name: '电路极限 burst', color: COLORS.muted, pts: bs, dash: true },
+        { name: '可持续（热约束）', color: style === 'logic-on-memory' ? COLORS.blue : COLORS.yellow, pts: ss }],
+      xLabel: '折叠层数', yLabel: '相对频率', yMin: 0.5,
+    });
+
+    const ok = f.benefit > f.penalty;
+    statTiles($('s-fold'), [
+      { v: (f.wlReduction * 100).toFixed(1) + '%', k: '线长降幅' },
+      { v: (f.freqGain >= 0 ? '+' : '') + (f.freqGain * 100).toFixed(1) + '%', k: '频率增益 (burst)', cls: f.freqGain >= 0 ? 'pos' : 'neg' },
+      { v: f.density.toFixed(0), k: '密度 MTr/mm²' },
+      { v: th.fSustained.toFixed(2) + '×', k: '可持续频率', cls: th.fSustained >= 0.95 ? 'pos' : (th.fSustained < 0.85 ? 'neg' : '') },
+      { v: ok ? '成立' : '反转', k: '判据 τ_B > τ_P（gear ' + f.gear.toFixed(1) + '）', cls: ok ? 'pos' : 'neg' },
+    ]);
+  }
+
+  /* ================= Panel 2 ================= */
+  function panel2() {
+    const intensity = Math.pow(10, +$('c-int').value);
+    const surf = +$('c-surf').value, hbm = +$('c-hbm').value;
+    $('v-int').textContent = fmtNum(intensity);
+    $('v-surf').textContent = surf.toFixed(3); $('v-hbm').textContent = hbm.toFixed(1);
+
+    const peak = [], edge = [], surfS = [];
+    for (let n = 8; n <= 64.01; n *= 1.09) {
+      const p = M.pkg(n, surf, hbm);
+      peak.push([n, p.peak]);
+      edge.push([n, Math.min(p.peak, intensity * p.bwEdge)]);
+      surfS.push([n, Math.min(p.peak, intensity * p.bwSurf)]);
+    }
+    lineChart($('ch-pkg'), {
+      series: [
+        { name: '峰值算力 ∝N²', color: COLORS.muted, pts: peak, dash: true },
+        { name: '2.5D 边缘供带宽', color: COLORS.red, pts: edge },
+        { name: '3D Folding 表面', color: COLORS.aqua, pts: surfS }],
+      xLabel: '边长 N (mm)', yLabel: 'TFLOPS', xLog: true, yLog: true,
+    });
+
+    const p30 = M.pkg(30, surf, hbm);
+    const ridge30 = p30.peak / p30.bwEdge;
+    let nCross = null;
+    for (let n = 8; n <= 200; n += 0.5) {
+      const p = M.pkg(n, surf, hbm);
+      if (p.peak / p.bwEdge > intensity) { nCross = n; break; }
+    }
+    statTiles($('s-pkg'), [
+      { v: fmtNum(ridge30), k: '2.5D ridge 强度 @N=30mm (FLOP/B)' },
+      { v: fmtNum(M.COMPUTE_DENSITY / surf), k: '3D ridge 强度（恒定, FLOP/B）' },
+      { v: nCross ? nCross.toFixed(0) + 'mm' : '>200mm', k: '2.5D 访存受限临界边长（当前强度）' },
+      { v: (p30.bwSurf / p30.bwEdge).toFixed(1) + '×', k: '3D/2.5D 带宽比 @N=30mm' },
+    ]);
+  }
+
+  /* ================= Panel 3 ================= */
+  function panel3() {
+    const wl = $('c-wl').value;
+    const ubo = +$('c-ubo').value * 1e-9, uba = +$('c-uba').value * 1e-9;
+    const ubb = +$('c-ubb').value * 1e9;
+    $('v-ubo').textContent = $('c-ubo').value;
+    $('v-uba').textContent = $('c-uba').value;
+    $('v-ubb').textContent = $('c-ubb').value;
+    const F = JSON.parse(JSON.stringify(M.FABRICS));
+    F.ub_protocol.o = ubo; F.ub_protocol.ae = uba;
+    F.ub_hione.o = ubo; F.ub_hione.ae = uba;
+    F.ub_hione.be = ubb; F.ub_hione.bi = ubb;
+
+    if (wl === 'train') {
+      $('t-net').textContent = '训练扩展效率 vs 集群规模（大消息 AllReduce）';
+      const mk = (fab) => { const pts = []; for (let e = 3; e <= 14; e++) { const n = Math.pow(2, e); pts.push([n, M.trainEff(n, fab) * 100]); } return pts; };
+      lineChart($('ch-net'), {
+        series: [
+          { name: 'TCP/IP 栈', color: COLORS.red, pts: mk(F.legacy_tcp) },
+          { name: 'RDMA/IB', color: COLORS.yellow, pts: mk(F.legacy_rdma) },
+          { name: 'UB+HiONE', color: COLORS.aqua, pts: mk(F.ub_hione) }],
+        xLabel: 'GPU/NPU 数', yLabel: '扩展效率 %', xLog: true, yMin: 0,
+      });
+      statTiles($('s-net'), [
+        { v: (M.trainEff(16384, F.legacy_tcp) * 100).toFixed(0) + '%', k: 'TCP @16k 卡', cls: 'neg' },
+        { v: (M.trainEff(16384, F.legacy_rdma) * 100).toFixed(0) + '%', k: 'RDMA @16k 卡' },
+        { v: (M.trainEff(16384, F.ub_hione) * 100).toFixed(0) + '%', k: 'UB+HiONE @16k 卡', cls: 'pos' },
+      ]);
+    } else {
+      $('t-net').textContent = 'MoE decode 每步时间 vs 专家并行规模（小消息，log）';
+      const mk = (fab) => { const pts = []; for (let e = 3; e <= 8; e++) { const n = Math.pow(2, e); pts.push([n, M.moeStep(n, fab) * 1e3]); } return pts; };
+      lineChart($('ch-net'), {
+        series: [
+          { name: 'TCP/IP 栈', color: COLORS.red, pts: mk(F.legacy_tcp) },
+          { name: 'RDMA/IB', color: COLORS.yellow, pts: mk(F.legacy_rdma) },
+          { name: 'UB 协议（同 400G 线）', color: COLORS.blue, pts: mk(F.ub_protocol) }],
+        xLabel: '专家并行规模', yLabel: 'ms/步', xLog: true, yLog: true,
+      });
+      const r = M.moeStep(128, F.legacy_rdma), u = M.moeStep(128, F.ub_protocol),
+        t = M.moeStep(128, F.legacy_tcp);
+      statTiles($('s-net'), [
+        { v: (t * 1e3).toFixed(0) + 'ms', k: 'TCP @128 卡', cls: 'neg' },
+        { v: (r * 1e3).toFixed(1) + 'ms', k: 'RDMA @128 卡' },
+        { v: (u * 1e3).toFixed(2) + 'ms', k: 'UB @128 卡', cls: 'pos' },
+        { v: (r / u).toFixed(1) + '× / ' + (t / u).toFixed(0) + '×', k: 'UB 相对 RDMA / TCP 加速' },
+      ]);
+    }
+  }
+
+  /* ================= Panel 4 ================= */
+  function panel4() {
+    const n = Math.pow(2, +$('c-ngpu').value);
+    $('v-ngpu').textContent = n;
+    const ub = $('c-ub').checked, hione = $('c-hione').checked;
+    const kM = $('c-3df').checked ? 2.5 : 1.0, kC = $('c-lf').checked ? 1.6 : 1.0;
+    const fab = hione ? 'ub_hione' : (ub ? 'ub_protocol' : 'legacy_tcp');
+    const base = M.iterationTau(n, 'legacy_tcp', 1, 1, 1);
+    const cur = M.iterationTau(n, fab, kC, kM, 1);
+    const keys = ['compute', 'memory', 'comm', 'other'];
+    const names = ['计算', '访存', '通信', '其他'];
+    const cols = [COLORS.blue, COLORS.yellow, COLORS.red, COLORS.muted];
+    stackChart($('ch-stack'), [
+      { label: '基线', vals: keys.map(k => base[k]) },
+      { label: '当前配置', vals: keys.map(k => cur[k]) },
+    ], cols, names);
+
+    const t0 = keys.reduce((a, k) => a + cur[k], 0);
+    const series = keys.map((k, i) => {
+      const pts = [];
+      for (let e = 0; e <= 2.001; e += 0.1) {
+        const kk = Math.pow(10, e);
+        const parts = { ...cur }; parts[k] = cur[k] / kk;
+        pts.push([kk, t0 / keys.reduce((a, q) => a + parts[q], 0)]);
+      }
+      return { name: '只加速' + names[i], color: cols[i], pts };
+    });
+    lineChart($('ch-amdahl'), {
+      series, xLabel: '单层 τ 压缩倍数', yLabel: '系统加速', xLog: true, yMin: 1,
+    });
+
+    const dom = keys.reduce((a, b) => cur[a] > cur[b] ? a : b);
+    const tb = keys.reduce((a, k) => a + base[k], 0);
+    statTiles($('s-cas'), [
+      { v: t0.toFixed(2) + 's', k: '当前迭代 τ' },
+      { v: (tb / t0).toFixed(2) + '×', k: '相对基线加速', cls: tb / t0 > 1.01 ? 'pos' : '' },
+      { v: names[keys.indexOf(dom)], k: '主导 τ 层 = 下一个投资方向' },
+      { v: (cur[dom] / t0 * 100).toFixed(0) + '%', k: '主导层占比（Amdahl 上限 ' + (1 / (1 - cur[dom] / t0)).toFixed(1) + '×）' },
+    ]);
+  }
+
+  /* 绑定 */
+  const bind = (ids, fn) => { ids.forEach(id => $(id).addEventListener('input', fn)); fn(); };
+  bind(['c-tiers', 'c-pitch', 'c-rent', 'c-eff', 'c-style', 'c-cool'], panel1);
+  bind(['c-int', 'c-surf', 'c-hbm'], panel2);
+  bind(['c-wl', 'c-ubo', 'c-uba', 'c-ubb'], panel3);
+  bind(['c-ub', 'c-hione', 'c-3df', 'c-lf', 'c-ngpu'], panel4);
+})();
+</script>
