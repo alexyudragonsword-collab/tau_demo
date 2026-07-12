@@ -80,6 +80,27 @@
     参数默认值即论文验证所用的文献校准值。</p>
   </header>
 
+  <!-- ============ Panel 0 器件层 ============ -->
+  <section>
+    <h2><span class="tag">Layer 1 · 器件层</span>几何缩放趋平（P1）</h2>
+    <p class="desc">晶体管仍在变快，但级延迟不再变快——速度饱和把门延迟收益从平方律压到线性，固定跨度中间布线的 RC 随铜尺寸效应飙升，最终反超门延迟。调下面的旋钮看临界节点如何移动。</p>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><label>中间布线跨度 (μm) <b id="v-span">50</b></label>
+          <input type="range" id="c-span" min="10" max="120" step="5" value="50"></div>
+        <div class="ctl"><label>铜电子自由程 (nm) <b id="v-mfp">40</b></label>
+          <input type="range" id="c-mfp" min="20" max="60" step="2" value="40"></div>
+        <div class="ctl"><label>互连纵横比 (高/宽) <b id="v-ar">2.0</b></label>
+          <input type="range" id="c-ar" min="1.0" max="3.0" step="0.25" value="2.0"></div>
+      </div>
+      <div class="charts">
+        <div class="stats" id="s-dev"></div>
+        <div class="fig"><h4>归一化 τ vs 工艺节点（28nm = 1）</h4><div id="ch-dev"></div></div>
+        <div class="fig"><h4>互连占级延迟比例（%）</h4><div id="ch-devbar"></div></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ Panel 1 折叠实验台 ============ -->
   <section>
     <h2><span class="tag">Layer 2 + 热约束</span>LogicFolding 折叠实验台</h2>
@@ -170,11 +191,17 @@
         <label class="toggle"><input type="checkbox" id="c-lf"> LogicFolding 提算力 (×1.6)</label>
         <div class="ctl" style="margin-top:6px"><label>集群规模 <b id="v-ngpu">4096</b></label>
           <input type="range" id="c-ngpu" min="9" max="14" step="1" value="12"></div>
+        <div class="ctl" style="margin-top:6px"><label>下方图视图</label>
+          <select id="c-casview">
+            <option value="bottleneck">瓶颈迁移 + Amdahl（A/C）</option>
+            <option value="decade">十年轨迹（实验 B）</option>
+            <option value="alpha">α 口径分解（实验 D）</option>
+          </select></div>
       </div>
       <div class="charts">
         <div class="stats" id="s-cas"></div>
-        <div class="fig"><h4>迭代 τ 构成：基线（传统协议栈） vs 当前配置（秒）</h4><div id="ch-stack"></div></div>
-        <div class="fig"><h4>当前配置下的单层 Amdahl 饱和（系统加速 vs 单层压缩倍数）</h4><div id="ch-amdahl"></div></div>
+        <div class="fig" id="wrap-stack"><h4>迭代 τ 构成：基线（传统协议栈） vs 当前配置（秒）</h4><div id="ch-stack"></div></div>
+        <div class="fig" id="wrap-amdahl"><h4 id="t-amdahl">当前配置下的单层 Amdahl 饱和（系统加速 vs 单层压缩倍数）</h4><div id="ch-amdahl"></div></div>
       </div>
     </div>
   </section>
@@ -242,11 +269,17 @@
       g += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="${COLORS.grid}" stroke-width="0.7"/>`;
       g += `<text x="${L - 6}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#898781">${lab}</text>`;
     }
-    const xt = 5;
-    for (let i = 0; i <= xt; i++) {
-      const v = x0 + (x1 - x0) * i / xt, x = L + i / xt * (W - L - R);
-      const lab = cfg.xLog ? fmtNum(Math.pow(10, v)) : fmtNum(v);
-      g += `<text x="${x}" y="${H - B + 16}" text-anchor="middle" font-size="10" fill="#898781">${lab}</text>`;
+    if (cfg.xCats) {
+      cfg.xCats.forEach((lab, i) => {
+        g += `<text x="${px(i)}" y="${H - B + 16}" text-anchor="middle" font-size="10" fill="#898781">${lab}</text>`;
+      });
+    } else {
+      const xt = 5;
+      for (let i = 0; i <= xt; i++) {
+        const v = x0 + (x1 - x0) * i / xt, x = L + i / xt * (W - L - R);
+        const lab = cfg.xLog ? fmtNum(Math.pow(10, v)) : fmtNum(v);
+        g += `<text x="${x}" y="${H - B + 16}" text-anchor="middle" font-size="10" fill="#898781">${lab}</text>`;
+      }
     }
     if (cfg.markX !== undefined)
       g += `<line x1="${px(cfg.markX)}" y1="${T}" x2="${px(cfg.markX)}" y2="${H - B}" stroke="#898781" stroke-width="1" stroke-dasharray="3 3"/>`;
@@ -323,6 +356,67 @@
   function statTiles(el, items) {
     el.innerHTML = items.map(i =>
       `<div class="stat"><div class="v${i.cls ? ' ' + i.cls : ''}">${i.v}</div><div class="k">${i.k}</div></div>`).join('');
+  }
+
+  /* 竖直柱状图（分类 + 可选参考线） */
+  function barChart(el, cats, values, colors, unit, refline, reflabel) {
+    const W = 720, H = 210, L = 46, R = 12, T = 14, B = 42;
+    let vmax = Math.max(...values, refline || 0) * 1.15 || 1;
+    const bw = (W - L - R) / cats.length * 0.62;
+    const step = (W - L - R) / cats.length;
+    const py = v => T + (1 - v / vmax) * (H - T - B);
+    let g = '';
+    for (let i = 0; i <= 4; i++) {
+      const v = vmax * i / 4, y = T + (1 - i / 4) * (H - T - B);
+      g += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="${COLORS.grid}" stroke-width="0.7"/>`;
+      g += `<text x="${L - 6}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#898781">${fmtNum(v)}</text>`;
+    }
+    if (refline !== undefined) {
+      g += `<line x1="${L}" y1="${py(refline)}" x2="${W - R}" y2="${py(refline)}" stroke="#898781" stroke-width="1" stroke-dasharray="4 3"/>`;
+      if (reflabel) g += `<text x="${W - R}" y="${py(refline) - 4}" text-anchor="end" font-size="10" fill="#52514e">${reflabel}</text>`;
+    }
+    cats.forEach((c, i) => {
+      const x = L + step * i + (step - bw) / 2;
+      const v = values[i];
+      g += `<rect x="${x}" y="${py(Math.max(v, 0))}" width="${bw}" height="${Math.abs(py(v) - py(0))}" rx="2" fill="${colors[i] || COLORS.blue}"><title>${c}: ${fmtNum(v)}${unit || ''}</title></rect>`;
+      g += `<text x="${x + bw / 2}" y="${py(Math.max(v, 0)) - 4}" text-anchor="middle" font-size="10" font-family="ui-monospace,monospace" fill="#52514e">${fmtNum(v)}${unit || ''}</text>`;
+      c.split('\n').forEach((line, li) =>
+        g += `<text x="${x + bw / 2}" y="${H - B + 15 + li * 12}" text-anchor="middle" font-size="9.5" fill="#898781">${line}</text>`);
+    });
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
+  }
+
+  /* ================= Panel 0 器件层 ================= */
+  function panel0() {
+    const span = +$('c-span').value, mfp = +$('c-mfp').value, ar = +$('c-ar').value;
+    $('v-span').textContent = span; $('v-mfp').textContent = mfp;
+    $('v-ar').textContent = ar.toFixed(2);
+    const oSpan = M.WIRE_SPAN_UM, oMfp = M.CU_MFP_NM, oAr = M.WIRE_AR;
+    M.WIRE_SPAN_UM = span; M.CU_MFP_NM = mfp; M.WIRE_AR = ar;
+    const d = M.deviceScan();
+    M.WIRE_SPAN_UM = oSpan; M.CU_MFP_NM = oMfp; M.WIRE_AR = oAr;
+
+    const cats = d.map(x => x.node);
+    const s0 = d[0];
+    lineChart($('ch-dev'), {
+      series: [
+        { name: '理想平方律', color: COLORS.muted, dash: true, pts: d.map((x, i) => [i, x.tauSq / s0.tauSq]) },
+        { name: '门本征 FO4', color: COLORS.blue, pts: d.map((x, i) => [i, x.tauInt / s0.tauInt]) },
+        { name: '级延迟(含互连)', color: COLORS.red, pts: d.map((x, i) => [i, x.tauStage / s0.tauStage]) }],
+      xCats: cats, xLabel: '工艺节点', yLabel: '归一化 τ',
+    });
+    barChart($('ch-devbar'), cats, d.map(x => x.wireFrac * 100),
+             cats.map(() => COLORS.yellow), '%');
+
+    // 临界节点：级延迟不再下降（相对上一节点回升）的首个节点
+    let crit = '—';
+    for (let i = 1; i < d.length; i++)
+      if (d[i].tauStage >= d[i - 1].tauStage) { crit = d[i].node; break; }
+    statTiles($('s-dev'), [
+      { v: (d[d.length - 1].tauStage / s0.tauStage).toFixed(2) + '×', k: '3nm 级延迟 / 28nm（>1 即倒退）', cls: d[d.length - 1].tauStage > s0.tauStage ? 'neg' : '' },
+      { v: Math.round(s0.wireFrac * 100) + '%→' + Math.round(d[d.length - 1].wireFrac * 100) + '%', k: '互连占比 28nm→3nm' },
+      { v: crit, k: '级延迟停止下降的临界节点' },
+    ]);
   }
 
   /* ================= Panel 1 ================= */
@@ -469,34 +563,76 @@
     const keys = ['compute', 'memory', 'comm', 'other'];
     const names = ['计算', '访存', '通信', '其他'];
     const cols = [COLORS.blue, COLORS.yellow, COLORS.red, COLORS.muted];
-    stackChart($('ch-stack'), [
-      { label: '基线', vals: keys.map(k => base[k]) },
-      { label: '当前配置', vals: keys.map(k => cur[k]) },
-    ], cols, names);
-
     const t0 = keys.reduce((a, k) => a + cur[k], 0);
-    const series = keys.map((k, i) => {
-      const pts = [];
-      for (let e = 0; e <= 2.001; e += 0.1) {
-        const kk = Math.pow(10, e);
-        const parts = { ...cur }; parts[k] = cur[k] / kk;
-        pts.push([kk, t0 / keys.reduce((a, q) => a + parts[q], 0)]);
-      }
-      return { name: '只加速' + names[i], color: cols[i], pts };
-    });
-    lineChart($('ch-amdahl'), {
-      series, xLabel: '单层 τ 压缩倍数', yLabel: '系统加速', xLog: true, yMin: 1,
-    });
-
     const dom = keys.reduce((a, b) => cur[a] > cur[b] ? a : b);
     const tb = keys.reduce((a, k) => a + base[k], 0);
-    statTiles($('s-cas'), [
-      { v: t0.toFixed(2) + 's', k: '当前迭代 τ' },
-      { v: (tb / t0).toFixed(2) + '×', k: '相对基线加速', cls: tb / t0 > 1.01 ? 'pos' : '' },
-      { v: names[keys.indexOf(dom)], k: '主导 τ 层 = 下一个投资方向' },
-      { v: (cur[dom] / t0 * 100).toFixed(0) + '%', k: '主导层占比（Amdahl 上限 ' + (1 / (1 - cur[dom] / t0)).toFixed(1) + '×）' },
-    ]);
+    const view = $('c-casview').value;
+    const amdahlWrap = $('wrap-amdahl');
+
+    if (view === 'bottleneck') {
+      amdahlWrap.style.display = '';
+      $('wrap-stack').querySelector('h4').textContent =
+        '迭代 τ 构成：基线（传统协议栈） vs 当前配置（秒）';
+      stackChart($('ch-stack'), [
+        { label: '基线', vals: keys.map(k => base[k]) },
+        { label: '当前配置', vals: keys.map(k => cur[k]) },
+      ], cols, names);
+      const series = keys.map((k, i) => {
+        const pts = [];
+        for (let e = 0; e <= 2.001; e += 0.1) {
+          const kk = Math.pow(10, e);
+          const parts = { ...cur }; parts[k] = cur[k] / kk;
+          pts.push([kk, t0 / keys.reduce((a, q) => a + parts[q], 0)]);
+        }
+        return { name: '只加速' + names[i], color: cols[i], pts };
+      });
+      lineChart($('ch-amdahl'), {
+        series, xLabel: '单层 τ 压缩倍数', yLabel: '系统加速', xLog: true, yMin: 1,
+      });
+      statTiles($('s-cas'), [
+        { v: t0.toFixed(2) + 's', k: '当前迭代 τ' },
+        { v: (tb / t0).toFixed(2) + '×', k: '相对基线加速', cls: tb / t0 > 1.01 ? 'pos' : '' },
+        { v: names[keys.indexOf(dom)], k: '主导 τ 层 = 下一个投资方向' },
+        { v: (cur[dom] / t0 * 100).toFixed(0) + '%', k: '主导层占比（Amdahl 上限 ' + (1 / (1 - cur[dom] / t0)).toFixed(1) + '×）' },
+      ]);
+    } else if (view === 'decade') {
+      amdahlWrap.style.display = 'none';
+      $('wrap-stack').querySelector('h4').textContent =
+        '级联实验 B · 十年系统 τ 轨迹（归一化, log）——单点优化饱和 vs 全栈协同';
+      const d = M.decadeTrajectories(n);
+      const palette = [COLORS.red, COLORS.yellow, COLORS.aqua];
+      lineChart($('ch-stack'), {
+        series: d.series.map((s, i) => ({
+          name: `${s.name} (α≈${s.alpha.toFixed(2)})`, color: palette[i],
+          pts: s.pts.map((v, y) => [y, v]),
+        })),
+        xLabel: '年', yLabel: '系统 τ (归一化)', yLog: true,
+      });
+      statTiles($('s-cas'), d.series.map((s, i) => ({
+        v: 'α≈' + s.alpha.toFixed(2), k: s.name + '（十年 ' + (1 / s.pts[s.pts.length - 1]).toFixed(1) + '×）',
+        cls: i === 2 ? 'pos' : '',
+      })));
+    } else {  // alpha
+      amdahlWrap.style.display = 'none';
+      $('wrap-stack').querySelector('h4').textContent =
+        '级联实验 D · α≈10/年 的口径分解（年化倍率）';
+      const a = M.alphaDecomp();
+      const cats = ['集成规模\nα_scale', '单芯片\nα_chip',
+        'α_eff\n(τ-first)', 'α_eff\n(legacy)', '精度/数制\n(模型外)'];
+      const vals = [M.ALPHA_SCALE, M.ALPHA_CHIP, a.tau_first.alphaEff,
+        a.legacy.alphaEff, M.ALPHA_PRECISION];
+      const bcols = [style_seq(1), style_seq(2), COLORS.aqua, COLORS.red, COLORS.muted];
+      barChart($('ch-stack'), cats, vals, bcols, '×', 1.0, '基线 1.0×');
+      const prodTau = M.ALPHA_SCALE * M.ALPHA_CHIP * a.tau_first.alphaEff;
+      statTiles($('s-cas'), [
+        { v: a.tau_first.alphaTotal.toFixed(2) + '/年', k: 'τ-first 硬件三因子 α', cls: 'pos' },
+        { v: a.legacy.alphaTotal.toFixed(2) + '/年', k: 'legacy（效率坍塌）α', cls: 'neg' },
+        { v: a.tau_first.capability[a.tau_first.capability.length - 1].toFixed(0) + '×', k: 'τ-first 十年能力' },
+        { v: (prodTau * M.ALPHA_PRECISION).toFixed(1) + '×', k: '叠加精度演进（论文 10× 还需算法因子）' },
+      ]);
+    }
   }
+  function style_seq(i) { return ['#86b6ef', '#5598e7', '#2a78d6'][i] || '#2a78d6'; }
 
   /* ================= Panel 5 敏感性 ================= */
   function tornadoChart(el, data, unit) {
@@ -580,10 +716,11 @@
 
   /* 绑定 */
   const bind = (ids, fn) => { ids.forEach(id => $(id).addEventListener('input', fn)); fn(); };
+  bind(['c-span', 'c-mfp', 'c-ar'], panel0);
   bind(['c-tiers', 'c-pitch', 'c-rent', 'c-eff', 'c-style', 'c-cool'], panel1);
   bind(['c-int', 'c-surf', 'c-hbm'], panel2);
   bind(['c-wl', 'c-ubo', 'c-uba', 'c-ubb'], panel3);
-  bind(['c-ub', 'c-hione', 'c-3df', 'c-lf', 'c-ngpu'], panel4);
+  bind(['c-ub', 'c-hione', 'c-3df', 'c-lf', 'c-ngpu', 'c-casview'], panel4);
   bind(['c-metric', 'c-perturb', 'c-sweepparam'], panel5);
 })();
 </script>

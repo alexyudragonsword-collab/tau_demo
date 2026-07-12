@@ -16,6 +16,8 @@ from tau_sim import thermal as TH
 from tau_sim.cascade import (SystemConfig, alpha_decomposition, amdahl_scan,
                              bottleneck_migration, decade_trajectories,
                              iteration_tau)
+from tau_sim import layer1_device as L1
+from tau_sim.layer1_device import scan_nodes
 from tau_sim.layer2_circuit import fold
 from tau_sim.layer3_chip import evaluate
 from tau_sim.layer4_system import (moe_decode_step, simpy_alltoall,
@@ -29,9 +31,55 @@ st.title("τ Lab — τ Scaling 交互式仿真")
 st.caption("模型与图表复用仓库 tau_sim/（论文验证所用的文献校准参数即默认值）。"
            "浏览器免安装版见 tau_lab.html。")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["① 折叠 + 热约束", "② 封装 N²-vs-N", "③ 集群通信（含 DES）",
-     "④ 级联实验 A-D", "⑤ 参数与出处", "⑥ 敏感性扫描"])
+tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["① 器件层 (P1)", "② 折叠 + 热约束", "③ 封装 N²-vs-N",
+     "④ 集群通信（含 DES）", "⑤ 级联实验 A-D", "⑥ 参数与出处",
+     "⑦ 敏感性扫描"])
+
+# ================= Tab 0 器件层 =================
+with tab0:
+    c1, c2 = st.columns([1, 3])
+    with c1:
+        span = st.slider("中间布线跨度 (μm)", 10, 120, int(L1.WIRE_SPAN_UM), 5)
+        mfp = st.slider("铜电子自由程 (nm)", 20, 60, int(P.CU_MFP_NM), 2)
+        ar = st.slider("互连纵横比 (高/宽)", 1.0, 3.0, P.WIRE_AR, 0.25)
+    with c2:
+        o_span, o_mfp, o_ar = L1.WIRE_SPAN_UM, P.CU_MFP_NM, P.WIRE_AR
+        L1.WIRE_SPAN_UM, P.CU_MFP_NM, P.WIRE_AR = span, mfp, ar
+        try:
+            d = scan_nodes()
+        finally:
+            L1.WIRE_SPAN_UM, P.CU_MFP_NM, P.WIRE_AR = o_span, o_mfp, o_ar
+        s0 = d[0]
+        x = np.arange(len(d))
+        m = st.columns(3)
+        m[0].metric("3nm 级延迟 / 28nm",
+                    f"{d[-1].tau_stage_ps/s0.tau_stage_ps:.2f}×",
+                    "倒退" if d[-1].tau_stage_ps > s0.tau_stage_ps else "仍改善")
+        m[1].metric("互连占比 28nm→3nm",
+                    f"{s0.wire_fraction*100:.0f}%→{d[-1].wire_fraction*100:.0f}%")
+        crit = next((p.node for a, p in zip(d, d[1:])
+                     if p.tau_stage_ps >= a.tau_stage_ps), "—")
+        m[2].metric("级延迟停止下降的临界节点", crit)
+
+        fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11, 3.9))
+        ax.plot(x, [p.tau_ideal_ps / s0.tau_ideal_ps for p in d], "--",
+                color=style.MUTED, label="理想平方律")
+        ax.plot(x, [p.tau_intrinsic_ps / s0.tau_intrinsic_ps for p in d], "-o",
+                ms=4, color=C[0], label="门本征 FO4")
+        ax.plot(x, [p.tau_stage_ps / s0.tau_stage_ps for p in d], "-o", ms=4,
+                color=C[5], label="级延迟 (含互连)")
+        ax.set_xticks(x, [p.node for p in d]); ax.set_ylabel("归一化 τ")
+        ax.set_xlabel("工艺节点"); ax.set_title("归一化 τ vs 节点")
+        ax.legend()
+        ax2.bar(x, [p.wire_fraction * 100 for p in d], color=C[2])
+        for xi, p in zip(x, d):
+            ax2.text(xi, p.wire_fraction * 100 + 1.5,
+                     f"{p.wire_fraction*100:.0f}%", ha="center", fontsize=9)
+        ax2.set_xticks(x, [p.node for p in d]); ax2.set_ylim(0, 90)
+        ax2.set_ylabel("互连占级延迟 (%)"); ax2.set_xlabel("工艺节点")
+        ax2.set_title("互连接管延迟预算")
+        st.pyplot(fig); plt.close(fig)
 
 # ================= Tab 1 折叠 + 热约束 =================
 with tab1:

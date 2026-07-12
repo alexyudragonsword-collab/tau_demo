@@ -244,7 +244,7 @@ M.moeStep = function (ep, fab) {
 
 M.SMALL_MSGS = 5000;
 
-M.iterationTau = function (nGpus, fabName, kComp, kMem, kOther) {
+M.iterationTau = function (nGpus, fabName, kComp, kMem, kOther, kComm) {
   const fab = M.FABRICS[fabName];
   const totalFlops = 6 * M.MODEL_PARAMS * M.GLOBAL_BATCH_TOKENS;
   const tCompute = totalFlops / (nGpus * M.PER_GPU_FLOPS);
@@ -256,9 +256,124 @@ M.iterationTau = function (nGpus, fabName, kComp, kMem, kOther) {
   return {
     compute: tCompute / kComp,
     memory: tMemory / kMem,
-    comm: tComm,
+    comm: tComm / (kComm || 1),
     other: tOther / (kOther || 1),
   };
+};
+M.totalTau = (nGpus, fab, kC, kM, kO, kCm) =>
+  Object.values(M.iterationTau(nGpus, fab, kC, kM, kO, kCm)).reduce((a, b) => a + b, 0);
+
+/* ---------------- Layer 1: 器件层节点扫描（对齐 layer1_device.py） ---------------- */
+
+M.NODES = {
+  '28nm': { lg: 30.0, vdd: 0.95, vth: 0.35, fo4: 15.0, w: 45 },
+  '16nm': { lg: 26.0, vdd: 0.80, vth: 0.33, fo4: 11.0, w: 32 },
+  '7nm':  { lg: 20.0, vdd: 0.75, vth: 0.30, fo4: 8.0,  w: 20 },
+  '5nm':  { lg: 17.0, vdd: 0.72, vth: 0.28, fo4: 7.0,  w: 15 },
+  '3nm':  { lg: 15.0, vdd: 0.70, vth: 0.26, fo4: 6.0,  w: 12 },
+};
+M.NODE_ORDER = ['28nm', '16nm', '7nm', '5nm', '3nm'];
+M.MU_LONG_CHANNEL = 2.0;
+M.WIRE_SPAN_UM = 50.0;
+
+M.bufferedWireNode = function (node) {   // ps/μm，含铜尺寸效应
+  const nd = M.NODES[node];
+  const w = nd.w * 1e-9, h = w * M.WIRE_AR;
+  const r = M.rhoCu(nd.w) / (w * h), c = M.WIRE_CAP_PER_M;
+  const cg = 0.5e-15, rg = nd.fo4 * 1e-12 / (5 * cg);
+  return 2 * Math.sqrt(0.38 * r * c * rg * cg) * 1e-6 * 1e12;
+};
+
+M.deviceScan = function () {
+  const ref = M.NODES['28nm'];
+  const sq = n => n.lg * n.lg * n.vdd / Math.pow(n.vdd - n.vth, M.MU_LONG_CHANNEL);
+  return M.NODE_ORDER.map(name => {
+    const nd = M.NODES[name];
+    const tauInt = nd.fo4;
+    const tauSq = ref.fo4 * sq(nd) / sq(ref);
+    const tauWire = M.bufferedWireNode(name) * M.WIRE_SPAN_UM;
+    const tauStage = tauInt + tauWire;
+    return { node: name, tauInt, tauSq, tauWire, tauStage,
+             wireFrac: tauWire / tauStage, wirePsPerMm: M.bufferedWireNode(name) * 1e3 };
+  });
+};
+
+/* ---------------- 级联实验 B/D（对齐 cascade.py） ---------------- */
+
+M.decadeTrajectories = function (nGpus, years) {
+  nGpus = nGpus || 4096; years = years || 10;
+  const t0 = M.totalTau(nGpus, 'legacy_tcp', 1, 1, 1, 1);
+  const deviceOnly = [], fabricOnly = [], tauFirst = [];
+  for (let y = 0; y <= years; y++) {
+    deviceOnly.push(M.totalTau(nGpus, 'legacy_tcp', Math.pow(1.15, y), 1, 1, 1) / t0);
+    const fab = y < 2 ? 'legacy_tcp' : (y < 4 ? 'legacy_rdma' : 'ub_hione');
+    fabricOnly.push(M.totalTau(nGpus, fab, 1, 1, 1, 1) / t0);
+  }
+  // τ-first：逐年演进 + 投给主导层
+  let kC = 1, kM = 1, kO = 1, kCm = 1, fab = 'legacy_tcp';
+  tauFirst.push(1);
+  for (let y = 1; y <= years; y++) {
+    kC *= 1.15;
+    if (y === 2) kC *= 1.25;
+    if (y === 3) fab = 'ub_protocol';
+    if (y === 4) fab = 'ub_hione';
+    if (y === 5) kM *= 1.6;
+    const parts = M.iterationTau(nGpus, fab, kC, kM, kO, kCm);
+    const dom = Object.keys(parts).reduce((a, b) => parts[a] > parts[b] ? a : b);
+    if (dom === 'compute') kC *= 1.2;
+    else if (dom === 'memory') kM *= 1.2;
+    else if (dom === 'comm') kCm *= 1.2;
+    else kO *= 1.2;
+    tauFirst.push(M.totalTau(nGpus, fab, kC, kM, kO, kCm) / t0);
+  }
+  const alpha = a => Math.pow(1 / a[a.length - 1], 1 / years);
+  return {
+    series: [
+      { name: '只推器件节点', pts: deviceOnly, alpha: alpha(deviceOnly) },
+      { name: '只换网络 fabric', pts: fabricOnly, alpha: alpha(fabricOnly) },
+      { name: '全栈 τ-first 协同', pts: tauFirst, alpha: alpha(tauFirst) },
+    ],
+  };
+};
+
+M.ALPHA_SCALE = 1.58; M.ALPHA_CHIP = 1.25; M.ALPHA_PRECISION = 1.30;
+M.N0_CHIPS = 512; M.TOKENS_PER_GPU = 1024;
+M.MODEL_GROWTH = Math.sqrt(M.ALPHA_SCALE * M.ALPHA_CHIP);
+
+M.weakScalingEff = function (nGpus, modelP, fab, kComm, perChip) {
+  const tComp = 6 * modelP * M.TOKENS_PER_GPU / (perChip * M.PER_GPU_FLOPS);
+  const vol = modelP * 2;
+  const tComm = M.hierAllreduceT(Math.round(nGpus), vol, fab) / (kComm || 1);
+  return tComp / (tComp + tComm);
+};
+
+M.alphaDecomp = function (years) {
+  years = years || 10;
+  const out = { years: [], legacy: null, tau_first: null };
+  for (let y = 0; y <= years; y++) out.years.push(y);
+  for (const strat of ['legacy', 'tau_first']) {
+    const caps = [], effs = [];
+    for (let y = 0; y <= years; y++) {
+      const n = M.N0_CHIPS * Math.pow(M.ALPHA_SCALE, y);
+      const perChip = Math.pow(M.ALPHA_CHIP, y);
+      const modelP = M.MODEL_PARAMS * Math.pow(M.MODEL_GROWTH, y);
+      let fab, kComm;
+      if (strat === 'legacy') { fab = M.FABRICS.legacy_rdma; kComm = 1; }
+      else if (y < 3) { fab = M.FABRICS.legacy_rdma; kComm = 1; }
+      else if (y < 4) { fab = M.FABRICS.ub_protocol; kComm = 1; }
+      else { fab = M.FABRICS.ub_hione; kComm = Math.pow(1.4, y - 4); }
+      const eff = M.weakScalingEff(n, modelP, fab, kComm, perChip);
+      effs.push(eff); caps.push(n * perChip * eff);
+    }
+    const cap0 = caps[0], eff0 = effs[0];
+    out[strat] = {
+      capability: caps.map(c => c / cap0),
+      eff: effs,
+      alphaTotal: Math.pow(caps[years] / cap0, 1 / years),
+      alphaEff: Math.pow(effs[years] / eff0, 1 / years),
+    };
+  }
+  return out;
 };
 
 /* ---------------- 敏感性扫描：参数注册表 + 指标 ---------------- */
