@@ -31,6 +31,16 @@ python build_tau_lab.py # 生成 tau_lab.html：浏览器免安装版（模型 J
 **敏感性扫描**（12 参数 × 5 指标的交互式龙卷风图 + 1D 结论翻转区扫描；
 Streamlit 版为 tab ⑥，同构实现）。
 
+## 图文并茂的完整报告
+
+```bash
+python build_report.py        # 生成 report_full.html + report_full.pdf
+python build_report.py --html # 只生成 HTML
+```
+
+把 `REPORT.md` 与 `figures/` 的 10 张图合并成单文件报告：`report_full.pdf`
+（可存档/分发/打印）与 `report_full.html`（零依赖，浏览器直接打开）。
+
 ## 结果速览（模型输入全部来自独立公开文献）
 
 | 命题 | 模型结果 | 论文对照 |
