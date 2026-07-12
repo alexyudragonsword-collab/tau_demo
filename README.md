@@ -43,6 +43,9 @@ python build_report.py --html # 只生成 HTML
 把 `REPORT.md` 与 `figures/` 的 10 张图合并成单文件报告：`report_full.pdf`
 （可存档/分发/打印）与 `report_full.html`（零依赖，浏览器直接打开）。
 
+对抗性附录 `CRITIQUE.md`（论文最易受质疑的假设/结论，每条挂对应仿真图）
+可用 `python build_critique.py` 渲染成自包含 `critique.html`。
+
 ## 结果速览（模型输入全部来自独立公开文献）
 
 | 命题 | 模型结果 | 论文对照 |
