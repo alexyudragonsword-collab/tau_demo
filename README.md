@@ -14,9 +14,14 @@ P5 全栈共享优化目标与瓶颈迁移）。
 
 ```bash
 pip install -r requirements.txt
-python run_all.py       # 生成 figures/fig1-fig10 + 控制台对照表
-python sensitivity.py   # 关键参数 ±50% 扰动的稳健性检查（17 项）
+python run_all.py           # 生成 figures/fig1-fig10 (中文标签) + 控制台对照表
+python run_all.py --lang en # 生成 figures_en/ (英文标签)
+python sensitivity.py       # 关键参数 ±50% 扰动的稳健性检查（17 项）
 ```
+
+> **中英双语**：四个 HTML 页面（`dashboard.html`、`tau_lab.html`、`report_full.html`、
+> `critique.html`）均带右上角 中/EN 切换开关；正文与图表随语言切换（英文用 `figures_en/`
+> 的英文标签图）。英译文档：`REPORT.en.md`、`CRITIQUE.en.md`、`dashboard_template.en.html`。
 
 ## 交互式 GUI（两个版本）
 

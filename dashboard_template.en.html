@@ -1,0 +1,347 @@
+<title>τ Scaling Full-Stack Cascade Simulation Validation</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --card-fig: #fcfcfb;
+    --ink: #14181c;
+    --ink2: #4d5560;
+    --muted: #7d8590;
+    --line: #e3e6ea;
+    --accent: #2a78d6;
+    --accent-soft: #e8f1fc;
+    --ok: #0ca30c;
+    --ok-soft: #e9f6e9;
+    --warn: #a06b00;
+    --warn-soft: #fdf3df;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111417; --surface: #1a1e23; --card-fig: #fcfcfb;
+      --ink: #eef1f4; --ink2: #b7bec7; --muted: #848d97;
+      --line: #2b3138; --accent: #5b9be2; --accent-soft: #1c2c40;
+      --ok: #3fbf3f; --ok-soft: #16281a;
+      --warn: #d9a03a; --warn-soft: #2e2413;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111417; --surface: #1a1e23; --card-fig: #fcfcfb;
+    --ink: #eef1f4; --ink2: #b7bec7; --muted: #848d97;
+    --line: #2b3138; --accent: #5b9be2; --accent-soft: #1c2c40;
+    --ok: #3fbf3f; --ok-soft: #16281a;
+    --warn: #d9a03a; --warn-soft: #2e2413;
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f8fa; --surface: #ffffff; --card-fig: #fcfcfb;
+    --ink: #14181c; --ink2: #4d5560; --muted: #7d8590;
+    --line: #e3e6ea; --accent: #2a78d6; --accent-soft: #e8f1fc;
+    --ok: #0ca30c; --ok-soft: #e9f6e9;
+    --warn: #a06b00; --warn-soft: #fdf3df;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB",
+      "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+    line-height: 1.75; font-size: 15.5px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ---------- header ---------- */
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 10px;
+  }
+  h1 {
+    font-size: 30px; line-height: 1.35; margin: 0 0 10px; font-weight: 700;
+    text-wrap: balance;
+  }
+  .subtitle { color: var(--ink2); max-width: 46em; margin: 0 0 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+  .chip {
+    font-family: var(--mono); font-size: 12px; color: var(--ink2);
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 4px; padding: 3px 9px;
+  }
+
+  /* ---------- proposition cards ---------- */
+  .props {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px; margin: 30px 0 8px;
+  }
+  .prop {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 6px; padding: 14px 16px 12px;
+  }
+  .prop-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .prop-id { font-family: var(--mono); font-weight: 700; color: var(--accent); font-size: 13px; }
+  .prop-name { font-weight: 600; font-size: 14px; flex: 1; }
+  .badge {
+    font-size: 11.5px; padding: 1px 8px; border-radius: 999px;
+    background: var(--ok-soft); color: var(--ok); font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.cond { background: var(--warn-soft); color: var(--warn); }
+  .prop-num {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 12.5px; color: var(--ink2); line-height: 1.6;
+  }
+  .prop-num b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 46px; }
+  h2 {
+    font-size: 21px; margin: 0 0 6px; font-weight: 700; text-wrap: balance;
+    padding-top: 10px; border-top: 2px solid var(--ink);
+  }
+  h2 .tag {
+    font-family: var(--mono); font-size: 12px; color: var(--accent);
+    font-weight: 600; letter-spacing: .06em; display: block; margin-bottom: 2px;
+  }
+  h3 { font-size: 16.5px; margin: 26px 0 6px; }
+  p { margin: 8px 0; max-width: 60em; }
+  .lead { color: var(--ink2); }
+  ul { margin: 8px 0; padding-left: 1.3em; max-width: 58em; }
+  li { margin: 4px 0; }
+  li::marker { color: var(--accent); }
+  strong { font-weight: 650; }
+
+  /* ---------- figure card ---------- */
+  figure {
+    margin: 18px 0; background: var(--card-fig);
+    border: 1px solid var(--line); border-radius: 6px; padding: 14px;
+  }
+  figure img { width: 100%; height: auto; display: block; border-radius: 2px; }
+  figcaption {
+    font-size: 12.5px; color: #52514e; margin-top: 10px; line-height: 1.6;
+    font-family: var(--mono);
+  }
+
+  /* ---------- tables ---------- */
+  .tbl-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--line);
+    vertical-align: top; }
+  th { font-size: 12px; letter-spacing: .05em; color: var(--muted);
+    font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .good { color: var(--ok); font-weight: 600; }
+
+  /* ---------- callouts ---------- */
+  .note {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 10px 16px; border-radius: 0 6px 6px 0; margin: 16px 0;
+    max-width: 58em;
+  }
+  .note.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .note p { margin: 4px 0; }
+
+  code, .m {
+    font-family: var(--mono); font-size: .92em; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px;
+  }
+  pre {
+    font-family: var(--mono); font-size: 13px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px;
+    overflow-x: auto; line-height: 1.7;
+  }
+  footer {
+    margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 13px;
+  }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Simulation Study · τ = f(τ<sub>transistor</sub>, τ<sub>circuit</sub>, τ<sub>chip</sub>, τ<sub>system</sub>)</div>
+    <h1>Validating the "Time Scaling Theory" with a Full-Stack τ Cascade Simulation</h1>
+    <p class="subtitle">An independent simulation-based argument for the five core propositions of Huawei's Ting-Bo He, "A Time Scaling Theory for Multi-Layer Electronic Systems" (ChinaXiv:202605.00224). All model inputs are drawn from independent public literature; the paper's own data serve only as a comparison target and do not enter the model.</p>
+    <div class="meta">
+      <span class="chip">Four-layer cascade: device → circuit → package → system</span>
+      <span class="chip">SimPy discrete-event validation</span>
+      <span class="chip">Sensitivity: 17 perturbations, 0 flips</span>
+      <span class="chip">python run_all.py reproducible</span>
+    </div>
+  </header>
+
+  <div class="props">
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P1</span>
+        <span class="prop-name">Geometric-scaling gains flatten</span>
+        <span class="badge">Simulation-supported</span></div>
+      <div class="prop-num">Interconnect share of stage delay <b>22% → 72%</b> (28→3nm)<br>Stage delay rises again beyond 5nm</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P2</span>
+        <span class="prop-name">LogicFolding folding criterion</span>
+        <span class="badge">Simulation-supported</span></div>
+      <div class="prop-num">Wire length <b>−24.9%</b> | skew <b>−24.9%</b> | frequency <b>+12.3%</b><br>Paper measurement: −30% / −25% / +13%</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P3</span>
+        <span class="prop-name">N²-vs-N fan-out dilemma</span>
+        <span class="badge">Simulation-supported</span></div>
+      <div class="prop-num">2.5D ridge shifts up with scale; beyond <b>N≈55mm</b> even GEMM becomes memory-bound; 3D stays fixed at 40 FLOP/B</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P4</span>
+        <span class="prop-name">UB communication τ compressed 500×</span>
+        <span class="badge cond">Supported by regime</span></div>
+      <div class="prop-num">Small messages: same physical line, swapped protocol stack <b>9–150×</b><br>Large messages: gains come mainly from bandwidth flattening</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">P5</span>
+        <span class="prop-name">τ is a full-stack shared optimization target</span>
+        <span class="badge">Emerges in simulation</span></div>
+      <div class="prop-num">Single-layer optimization saturates at the reciprocal of its share; coordinated α <b>1.22</b> vs single-point 1.02–1.08; the bottleneck migrates layer by layer</div>
+    </div>
+    <div class="prop">
+      <div class="prop-head"><span class="prop-id">＋</span>
+        <span class="prop-name">Phase 2: thermal constraint &amp; α convention</span>
+        <span class="badge cond">Conditionally reachable</span></div>
+      <div class="prop-num">Heterogeneous folding sustains f≈<b>0.98</b> (homogeneous 0.80)<br>Hardware three-factor α≈<b>2.0/yr</b>; 10× requires out-of-model factors</div>
+    </div>
+  </div>
+
+  <section id="idea">
+    <h2><span class="tag">§1</span>Core Idea of the Paper</h2>
+    <p>The paper's central thesis: <strong>the essence of Moore's law was never "smaller," but "faster"</strong>—transistor shrinking is valuable because switching is faster, signal propagation is shorter, and fewer boundaries are crossed; spatial scaling is merely a means of compressing time. Once geometric scaling fails below 7nm, the characteristic time constant <span class="m">τ</span> should be adopted directly as the primary optimization target, defined and compressed at every layer of the stack (transistor ps → circuit → chip ns → system s, spanning roughly 12 orders of magnitude):</p>
+    <pre>τ = f(τ_transistor, τ_circuit, τ_chip, τ_system)        τ_{n+1} = τ_n / α</pre>
+    <p>α varies with the application (mobile ~1.3/yr, AI up to 10/yr). τ's unique value lies in being a <strong>single unified dimension across the full stack</strong>: for the first time, process, circuit, and system engineers can discuss the same quantity in the same units, making cross-layer coordinated optimization possible—this is what the paper claims to be the first full-stack shared optimization target since Dennard.</p>
+  </section>
+
+  <section id="layer1">
+    <h2><span class="tag">Layer 1 · Device layer</span>P1 — Pure geometric scaling flattens</h2>
+    <p class="lead">α-power law (velocity saturation) + copper interconnect size effect, with FO4 and line resistance taken from public-literature anchors.</p>
+    <ul>
+      <li>The intrinsic gate delay improves only to 0.40× from 28nm to 3nm; velocity saturation compresses the gain from a square law down to linear;</li>
+      <li>Once copper linewidth drops below the electron mean free path, resistivity soars: the optimal repeated-wire delay rises from 84 to 302 ps/mm;</li>
+      <li>After adding fixed-span intermediate routing, <strong>stage delay rises again beyond 5nm</strong>, with the interconnect share going 22%→72%—"transistors keep getting faster, but system τ no longer does," which is precisely the motivation for τ scaling.</li>
+    </ul>
+    <figure><img src="{{FIG1}}" alt="Figure 1 Per-generation decay of geometric-scaling τ gains and the rising interconnect share">
+      <figcaption>fig 1 · Left: ideal square law / velocity-saturated intrinsic / stage delay including interconnect; Right: interconnect share of stage delay rising with node</figcaption></figure>
+  </section>
+
+  <section id="layer2">
+    <h2><span class="tag">Layer 2 · Circuit layer</span>P2 — LogicFolding and the folding criterion</h2>
+    <p class="lead">Davis a priori wire-length distribution (Rent's rule) + optimal repeater delay + folding geometry; fixed 7nm node, 10⁷-gate processing core, 1.5μm hybrid bonding.</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>Metric</th><th>Model (2-layer fold)</th><th>Paper measurement (Kirin 2026)</th><th>Notes</th></tr>
+      <tr><td>Average wire-length reduction</td><td class="num good">−24.9%</td><td class="num">−30%</td><td>Theoretical ceiling 29.3%, with layout efficiency 0.85</td></tr>
+      <tr><td>Clock-skew reduction</td><td class="num good">−24.9%</td><td class="num">−25%</td><td>Model output (clock tree shrinks proportionally), not an input</td></tr>
+      <tr><td>Critical-path frequency</td><td class="num good">+12.3%</td><td class="num">+13%</td><td>252ps → 225ps</td></tr>
+      <tr><td>Transistor density</td><td class="num">239 MTr/mm²</td><td class="num">238</td><td>⚠ Area overhead is calibrated, not an independent prediction</td></tr>
+      <tr><td>4-layer fold (forward-looking)</td><td class="num">wire length −42.5% / frequency +24.8% / density 378</td><td class="num">Roadmap 2031: 400+</td><td>No thermal-constraint ceiling; see thermal-constraint section</td></tr>
+    </table></div>
+    <figure><img src="{{FIG3}}" alt="Figure 3 LogicFolding gain model compared with the paper's measurements"><figcaption>fig 3 · Three-way comparison of the model (independent-literature parameters) against Kirin 2026 measurements</figcaption></figure>
+    <p>The paper's folding criterion <span class="m">τ_Benefit &gt; τ_Penalty</span> genuinely exists in the model: sweeping the hybrid-bonding pitch, the crossover falls at <strong>≈3.1μm (gear ratio ≈ 4.3, sensitive region 3.3–6.2)</strong>. The paper's engineering conclusion that "gear ratio should stay below 3" sits on the safe side, and Kirin's 1.5μm choice has about a 2× margin.</p>
+    <figure><img src="{{FIG2}}" alt="Figure 2 Crossover of the folding criterion τ_Benefit and τ_Penalty versus bonding pitch"><figcaption>fig 2 · Criterion-reversal-point sweep: the finer the pitch, the larger the benefit region; at gear ratio ≈ 1 the routing penalty vanishes</figcaption></figure>
+  </section>
+
+  <section id="layer3">
+    <h2><span class="tag">Layer 3 · Package layer</span>P3 — N²-vs-N fan-out dilemma</h2>
+    <p class="lead">Compute ∝ N² (area), 2.5D edge bandwidth ∝ N (perimeter), 3D surface bandwidth ∝ N²; anchored to H100-class compute/bandwidth density, roofline analysis.</p>
+    <ul>
+      <li>Achievable compute for memory-bound workloads: 2.5D along slope 1, 3D along slope 2—the divergence on the log-log plot is the topological deficit itself;</li>
+      <li>2.5D's ridge operational intensity rises linearly with edge length; <strong>beyond N≈55mm even training GEMM (~300 FLOP/B) becomes memory-bound</strong>; 3D Folding stays fixed at ~40 FLOP/B, independent of scale;</li>
+      <li>This confirms the paper's judgment: "no transistor-level improvement can make up for the topological deficit"—it is a purely geometric fact.</li>
+    </ul>
+    <figure><img src="{{FIG4}}" alt="Figure 4 N²-vs-N fan-out dilemma"><figcaption>fig 4 · Left: achievable compute, slope 1 vs slope 2; Right: ridge intensity rising with scale and its crossing with the GEMM/decode intensity lines</figcaption></figure>
+  </section>
+
+  <section id="layer4">
+    <h2><span class="tag">Layer 4 · System layer</span>P4 — The regime in which communication-τ compression is realized</h2>
+    <p class="lead">α-β collective-communication cost model (Thakur) + SimPy discrete-event simulation (with link contention and jitter) for cross-validation; fabric parameters taken from OSDI/SIGCOMM measurements and public UB-Mesh/CloudMatrix data.</p>
+    <ul>
+      <li><strong>Large-message regime</strong> (training-gradient AllReduce, 200GB/iteration): scaling efficiency is set by bandwidth. At 16384 cards, TCP-class 7%, RDMA/IB 17%, UB+Hi-ONE 26%—the 500× latency advantage is realized only to a limited extent here;</li>
+      <li><strong>Small-message regime</strong> (MoE inference all-to-all, KB-scale): protocol-stack α completely dominates. On the same 400G physical line, 128-card expert parallelism per step: TCP ~400ms, RDMA ~24ms, UB protocol ~2.6ms—<strong>9× (vs RDMA) to 150× (vs TCP)</strong>;</li>
+      <li>Conclusion: P4 holds but requires refinement—the value of low α concentrates in fine-grained access (MoE routing, memory pooling, synchronization primitives), while large-message gains come from UB+Hi-ONE bandwidth flattening. <strong>Neither can be dispensed with, which is itself an example of cross-layer coordination.</strong></li>
+    </ul>
+    <figure><img src="{{FIG5}}" alt="Figure 5 Cluster-communication scaling efficiency and MoE small-message latency"><figcaption>fig 5 · Left: training scaling efficiency (large messages); Right: MoE all-to-all (small messages), with open squares as SimPy event-level validation points</figcaption></figure>
+  </section>
+
+  <section id="cascade">
+    <h2><span class="tag">Cascade experiment</span>P5 — τ as a full-stack shared optimization target</h2>
+    <p class="lead">System scenario: 4096 cards, a 100B-parameter LLM training iteration. Baseline τ decomposition: communication 67% / compute 20% / memory access 11% / other 2% (the communication share is consistent with the measured ranges of MegaScale and Domino).</p>
+
+    <h3>Experiment A · Amdahl saturation of single-layer optimization</h3>
+    <p>Compressing any single layer's τ by 100× on its own, the system speedup saturates at the reciprocal of that layer's share (communication 3.0×, compute 1.25×, memory access 1.13×). <strong>No single layer can sustain "α× per year" by itself.</strong></p>
+    <figure><img src="{{FIG6}}" alt="Figure 6 Amdahl saturation curves"><figcaption>fig 6 · Dashed lines are the speedup ceilings 1/(1−share) set by each layer's share</figcaption></figure>
+
+    <h3>Experiment B · Ten-year evolution: single-point vs full-stack coordination</h3>
+    <p>Pushing only the device node α≈1.02, swapping only the network fabric α≈1.08 (stagnating from year 4), <strong>full-stack τ-first coordination α≈1.22</strong>—only by directing each year's improvement toward "that year's dominant τ layer" can α be sustained over a decade.</p>
+    <figure><img src="{{FIG7}}" alt="Figure 7 Ten-year trajectory comparison"><figcaption>fig 7 · System τ (log), fixed 4096-card convention</figcaption></figure>
+
+    <h3>Experiment C · Bottleneck migration</h3>
+    <p>Introducing optimizations in the order of the paper's technology roadmap: <span class="m">communication → communication → compute → compute → communication</span>. Within the overall 3.0×, no single step works in isolation; each optimization pushes the dominant layer onto another—<strong>"the dominant τ layer is the next investment direction" emerges naturally in the model</strong>, and the bottleneck cycles back (after stage 4 communication should again receive investment, corresponding to the UB2.0 roadmap).</p>
+    <figure><img src="{{FIG8}}" alt="Figure 8 Bottleneck-migration stacked chart"><figcaption>fig 8 · Per-stage iteration-τ composition with dominant-layer annotations</figcaption></figure>
+
+    <h3>Experiment D · Decomposition of the paper's AI-side α≈10/yr convention</h3>
+    <p>Weak scaling + model size growing in step with compute (Chinchilla convention). System capability = integration scale × per-chip × scaling efficiency:</p>
+    <ul>
+      <li>Fabric does not evolve (legacy): scaling efficiency collapses 0.47→0.08, α_eff=0.84, 165× over ten years;</li>
+      <li>τ-first (fabric evolving in step with compute): efficiency is maintained (α_eff≈1.02), α_total≈2.0/yr, <strong>1064× over ten years</strong>—echoing the paper's "100×/decade integration" order of magnitude;</li>
+      <li><strong>Honest conclusion</strong>: the hardware three-factor (1.58×1.25×1.0)≈2.0/yr, plus precision evolution ≈2.6/yr; the paper's α≈10 still requires out-of-model factors such as algorithms/software. τ compression's real role is to <strong>keep the gains from scale growth from being eaten by communication (holding α_eff≈1)</strong>.</li>
+    </ul>
+    <figure><img src="{{FIG10}}" alt="Figure 10 Decomposition of the α convention"><figcaption>fig 10 · Left: weak-scaling ten-year trajectory; Right: factor decomposition of α</figcaption></figure>
+  </section>
+
+  <section id="thermal">
+    <h2><span class="tag">Phase-2 supplement</span>Thermal constraint — sustainability of multi-layer folding</h2>
+    <p class="lead">One-dimensional thermal-resistance network (thinned silicon 0.34 + bonding interface ~3 K·mm²/W) + α-power-law power-frequency coupling; temperature-rise budget 60K; corresponding to the paper's open question §6.</p>
+    <ul>
+      <li><strong>The main body of the thermal constraint is TDP, not inter-layer thermal resistance</strong>: folding doubling per-unit-area power density is the primary penalty, while the inter-layer gradient occupies only ≤7% of the budget (even at a bonding thermal resistance of 10 K·mm²/W it is only 18%);</li>
+      <li>Homogeneous "logic+logic" full-power folding: the sustainable frequency drops to 0.80 for 2 layers and 0.60 for 4 layers—full-power multi-layer logic folding must be paired with power-delivery/cooling breakthroughs;</li>
+      <li><strong>Heterogeneous "logic+memory" folding (the actual form of Kirin 2026) sustains 0.98 at 2 layers, nearly lossless</strong>, while retaining the +12% burst frequency and the energy-efficiency gains from reduced line capacitance—this explains why the paper's deployment path is "fold memory onto logic" rather than "fold logic onto logic," and revises the 4-layer outlook from a "ceiling" to "conditionally reachable."</li>
+    </ul>
+    <figure><img src="{{FIG9}}" alt="Figure 9 Sustainable frequency under the thermal constraint"><figcaption>fig 9 · Left: sustainable frequency vs layer count (dashed line is the thermal-unconstrained circuit limit); Right: temperature-rise composition</figcaption></figure>
+  </section>
+
+  <section id="params">
+    <h2><span class="tag">§Method</span>Parameter calibration (independent of the paper under validation)</h2>
+    <p>To avoid circular reasoning: the paper's own data serve only as "targets to reproduce." Model inputs are drawn entirely from independent public literature; excerpted:</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>Parameter</th><th>Value</th><th>Source</th></tr>
+      <tr><td>FO4 gate delay 28→3nm</td><td class="num">15 → 6 ps (±30%)</td><td>Harris; Stillmaker &amp; Baas 2017 (PTM)</td></tr>
+      <tr><td>Velocity-saturation exponent α</td><td class="num">1.25</td><td>Sakurai &amp; Newton, IEEE JSSC 1990</td></tr>
+      <tr><td>Copper resistivity size effect</td><td class="num">ρ(w)=1.68·(1+40nm/w)</td><td>Steinhögl measurement fit; imec BEOL</td></tr>
+      <tr><td>A priori wire-length distribution / Rent p</td><td class="num">Davis closed form / 0.62</td><td>Davis-De-Meindl, IEEE TED 1998; Bakoglu</td></tr>
+      <tr><td>3D wire-length shrinkage</td><td class="num">1/√k × efficiency 0.85</td><td>Rahman &amp; Reif 2000; OpenSPARC T2 case</td></tr>
+      <tr><td>Hybrid bonding R / C</td><td class="num">0.3Ω / 0.2fF @2μm</td><td>imec ECTC (79.5mΩ measured); TSMC SoIC</td></tr>
+      <tr><td>Compute/HBM anchors</td><td class="num">1.2 TF/mm²; 1.2TB/s/stack</td><td>NVIDIA H100 datasheet; Micron HBM3E</td></tr>
+      <tr><td>TCP / RDMA / UB latency</td><td class="num">25μs / 1.5μs / 0.15μs</td><td>IX OSDI'14; eRPC NSDI'19; UB-Mesh; CloudMatrix384</td></tr>
+      <tr><td>AllReduce cost / gradient volume</td><td class="num">2(n−1)(o+α)+2V(n−1)/nB / 2Ψ</td><td>Thakur IJHPCA 2005; ZeRO SC'20</td></tr>
+      <tr><td>Operational intensity GEMM / decode</td><td class="num">300 / 2 FLOP/B</td><td>NVIDIA matrix-multiply guide; Pope et al. 2022</td></tr>
+    </table></div>
+    <p>The full 30+ parameter table with per-item sources is in the repository's <code>tau_sim/params.py</code> and <code>REPORT.md</code>.</p>
+  </section>
+
+  <section id="robust">
+    <h2><span class="tag">§Robustness</span>Sensitivity and limitations</h2>
+    <p><strong>Sensitivity</strong>: 17 key parameters perturbed at the ±50% level (Rent exponent, folding efficiency, routing coefficient, bonding capacitance/thermal resistance, interconnect power share, fabric parameters in directions unfavorable to UB, etc.), with <strong>0 reversals of conclusion direction</strong>: the folding frequency gain stays within +7.7%~+19.4%, the criterion-reversal point stays above Kirin's 1.5μm, the coordinated α always beats the single-point one, and heterogeneous folding always beats homogeneous.</p>
+    <div class="note warn">
+      <p><strong>Honest reservations</strong></p>
+      <p>① Density 155→238 is calibrated via area overhead and constitutes a consistency check rather than an independent prediction; ② the cluster model does not include compute-communication overlap, which would proportionally lower the absolute communication share but not change the order of bottleneck migration; ③ the UB fabric parameters come from Huawei's self-reported papers (UB-Mesh/CloudMatrix) and lack independent benchmark corroboration for now—if the actual latency is higher, the gap in Figure 5 narrows proportionally but the regime structure is unchanged; ④ the paper's α≈10/yr cannot be explained by hardware factors alone and requires the addition of precision/algorithm evolution, a convention that warrants more precise definition in the paper.</p>
+    </div>
+  </section>
+
+  <section id="verdict">
+    <h2><span class="tag">§Conclusion</span>Overall assessment</h2>
+    <p>Under independent parameter calibration, all five core propositions of the paper receive simulation support (P4 requires refinement by message regime, and multi-layer folding requires refinement by cooling conditions). Most important is the methodological proposition P5: <strong>single-layer optimization saturates, coordination sustains α, and dominant-layer migration indicates the investment direction—these are not "assumed into" the model but emerge naturally from the cascade of the four-layer physical/queueing model</strong>. This is the strongest support for τ scaling as an actionable methodology (rather than a slogan).</p>
+    <pre># Reproduce
+git clone -b claude/paper-analysis-model-scenario-m8lzj0 &lt;repo&gt;
+pip install -r requirements.txt
+python run_all.py        # Generate all 10 figures
+python sensitivity.py    # 17-perturbation check</pre>
+  </section>
+
+  <footer>
+    Simulation and report · 2026-07 · Repository alexyudragonsword-collab/tau_demo (branch claude/paper-analysis-model-scenario-m8lzj0) · Paper under validation ChinaXiv:202605.00224v1
+  </footer>
+</div>

@@ -69,8 +69,17 @@
     color:var(--muted); font-size:12.5px; }
   a { color:var(--accent); }
   :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .langtoggle { position:fixed; top:14px; right:16px; z-index:50; display:flex;
+    border:1px solid var(--line); border-radius:7px; overflow:hidden;
+    background:var(--surface); box-shadow:0 1px 5px rgba(0,0,0,.12); font-size:13px; }
+  .langtoggle button { border:none; background:var(--surface); padding:6px 13px;
+    cursor:pointer; color:var(--ink2); font:inherit; }
+  .langtoggle button.active { background:var(--accent); color:#fff; }
 </style>
 
+<div class="langtoggle" role="group" aria-label="language">
+  <button data-l="zh" class="active">中文</button><button data-l="en">EN</button>
+</div>
 <div class="wrap">
   <header>
     <div class="eyebrow">τ Lab · Interactive Simulation</div>
@@ -95,8 +104,8 @@
       </div>
       <div class="charts">
         <div class="stats" id="s-dev"></div>
-        <div class="fig"><h4>归一化 τ vs 工艺节点（28nm = 1）</h4><div id="ch-dev"></div></div>
-        <div class="fig"><h4>互连占级延迟比例（%）</h4><div id="ch-devbar"></div></div>
+        <div class="fig"><h4 id="h4-dev">归一化 τ vs 工艺节点（28nm = 1）</h4><div id="ch-dev"></div></div>
+        <div class="fig"><h4 id="h4-devbar">互连占级延迟比例（%）</h4><div id="ch-devbar"></div></div>
       </div>
     </div>
   </section>
@@ -128,8 +137,8 @@
       </div>
       <div class="charts">
         <div class="stats" id="s-fold"></div>
-        <div class="fig"><h4>折叠判据：τ_Benefit vs τ_Penalty 随键合 pitch（ps）</h4><div id="ch-criterion"></div></div>
-        <div class="fig"><h4>频率：电路极限 (burst) vs 热约束下可持续（相对 2D = 1）</h4><div id="ch-freq"></div></div>
+        <div class="fig"><h4 id="h4-crit">折叠判据：τ_Benefit vs τ_Penalty 随键合 pitch（ps）</h4><div id="ch-criterion"></div></div>
+        <div class="fig"><h4 id="h4-freq">频率：电路极限 (burst) vs 热约束下可持续（相对 2D = 1）</h4><div id="ch-freq"></div></div>
       </div>
     </div>
   </section>
@@ -149,7 +158,7 @@
       </div>
       <div class="charts">
         <div class="stats" id="s-pkg"></div>
-        <div class="fig"><h4>可达算力 vs die/封装等效边长（log-log，TFLOPS）</h4><div id="ch-pkg"></div></div>
+        <div class="fig"><h4 id="h4-pkg">可达算力 vs die/封装等效边长（log-log，TFLOPS）</h4><div id="ch-pkg"></div></div>
       </div>
     </div>
   </section>
@@ -715,6 +724,125 @@ if (typeof window !== 'undefined') window.TauModel = M;
   const $ = (id) => document.getElementById(id);
   const tip = $('tip');
 
+  /* ================= 国际化 i18n ================= */
+  let LANG = 'zh';
+  const TT = (zh, en) => LANG === 'zh' ? zh : en;
+  // 模型返回的中文键 → 英文
+  const TR_TRAJ = {'只推器件节点':'Device node only','只换网络 fabric':'Fabric swap only',
+    '全栈 τ-first 协同':'Full-stack τ-first'};
+  const TR_PARAM = {'Rent 指数 p':'Rent exponent p','折叠布局效率':'Fold layout efficiency',
+    '时钟裕量占比':'Clock margin fraction','绕线系数':'Detour coefficient',
+    '键合电容/焊盘':'Bond cap / pad','层间热阻':'Inter-tier resistance',
+    '互连功耗占比':'Interconnect power fraction','存储层功率比':'Memory-tier power ratio',
+    '温升预算':'ΔT budget','UB 每消息开销':'UB per-msg overhead',
+    'UB 跨机延迟 α':'UB inter-node latency α','TCP 栈开销':'TCP stack overhead'};
+  const TR_METRIC = {'2层折叠频率增益 @1.5μm':'2-tier fold freq gain @1.5μm',
+    '判据反转点 pitch':'Criterion flip pitch','2层异构折叠可持续频率（移动）':'Hetero sustainable freq (mobile)',
+    'MoE @128卡 UB 相对 RDMA 加速':'MoE @128 UB vs RDMA speedup',
+    '级联全开相对基线加速 @4096卡':'Full-cascade speedup @4096'};
+  const TR_FLIP = {'增益转负 → 折叠不再划算':'gain turns negative → folding no longer pays',
+    '反转点低于 Kirin 的 1.5μm 工作点':"flip point below Kirin's 1.5μm",
+    '低于 0.9 → 不再"近乎无损"':'below 0.9 → no longer "near-lossless"',
+    'UB 不再占优':'UB no longer wins','级联优化无净收益':'no net cascade gain'};
+  const trt = s => LANG === 'zh' ? s : (TR_TRAJ[s] || s);
+  const trp = s => LANG === 'zh' ? s : (TR_PARAM[s] || s);
+  const trm = s => LANG === 'zh' ? s : (TR_METRIC[s] || s);
+  const trf = s => LANG === 'zh' ? s : (TR_FLIP[s] || s);
+  // 层名（模型键）
+  const LN = () => ({compute: TT('计算','Compute'), memory: TT('访存','Memory'),
+    comm: TT('通信','Comm'), other: TT('其他','Other')});
+  const LNAME = ['compute','memory','comm','other'];
+
+  const PANEL_TXT = [
+    ['Layer 1 · 器件层', 'Layer 1 · Device', '几何缩放趋平（P1）', 'Geometric scaling flattens (P1)',
+     '晶体管仍在变快，但级延迟不再变快——速度饱和把门延迟收益从平方律压到线性，固定跨度中间布线的 RC 随铜尺寸效应飙升，最终反超门延迟。调下面的旋钮看临界节点如何移动。',
+     'Transistors keep getting faster, but stage delay no longer does — velocity saturation compresses gate-delay gains from square-law to linear, and fixed-span intermediate-wire RC soars with the Cu size effect, finally overtaking the gate. Drag the knobs to see how the crossover node moves.'],
+    ['Layer 2 + 热约束', 'Layer 2 + Thermal', 'LogicFolding 折叠实验台', 'LogicFolding workbench',
+     '判据 τ_Benefit > τ_Penalty 决定折叠是否划算；热约束决定收益是否可持续。虚线竖标 = 当前键合 pitch 工作点。',
+     'The criterion τ_Benefit > τ_Penalty decides whether folding pays; the thermal constraint decides whether the gain is sustainable. Dashed vertical marker = current bonding-pitch operating point.'],
+    ['Layer 3', 'Layer 3', '封装 N²-vs-N 扇出困境', 'Package N²-vs-N fan-out dilemma',
+     '算力 ∝ N²，2.5D 边缘带宽 ∝ N，3D 表面带宽 ∝ N²。可达算力 = min(峰值, 强度 × 带宽)。',
+     'Compute ∝ N², 2.5D edge bandwidth ∝ N, 3D surface bandwidth ∝ N². Achievable compute = min(peak, intensity × bandwidth).'],
+    ['Layer 4', 'Layer 4', '集群通信 τ', 'Cluster communication τ',
+     '大消息（训练梯度 AllReduce）看带宽，小消息（MoE all-to-all）看协议栈 α——UB 的 500× 延迟压缩在小消息 regime 兑现。可微调 UB 参数做压力测试。',
+     "Large messages (training-gradient AllReduce) are bandwidth-bound; small messages (MoE all-to-all) are protocol-stack-α-bound — UB's 500× latency compression pays off in the small-message regime. Tweak the UB parameters to stress-test."],
+    ['级联', 'Cascade', '瓶颈迁移与 Amdahl 上限', 'Bottleneck migration & Amdahl ceiling',
+     '开关各项技术，观察 4096 卡训练迭代 τ 的构成变化——主导 τ 层就是下一个投资方向。下图为当前配置下"只加速单层"的 Amdahl 饱和曲线。',
+     "Toggle the technologies and watch how the 4096-chip training-iteration τ composition shifts — the dominant τ layer is the next investment. The lower chart is the 'speed up one layer only' Amdahl saturation for the current config."],
+    ['稳健性', 'Robustness', '敏感性扫描', 'Sensitivity scan',
+     '龙卷风图：每个参数 ±扰动幅度 后指标的摆动区间，按影响降序——最上面的就是最能撼动结论的参数。下方 1D 扫描把「结论翻转区」直接着色。',
+     "Tornado diagram: the swing of the metric when each parameter is perturbed by ±amount, ranked by impact — the top bar most moves the conclusion. The 1D sweep below shades the 'conclusion-flip region' directly."],
+  ];
+  const LABELS = {
+    'c-span':['中间布线跨度 (μm)','Wire span (μm)'], 'c-mfp':['铜电子自由程 (nm)','Cu mean free path (nm)'],
+    'c-ar':['互连纵横比 (高/宽)','Wire aspect ratio (h/w)'], 'c-tiers':['折叠层数','Fold tiers'],
+    'c-pitch':['混合键合 pitch (μm)','Hybrid-bond pitch (μm)'], 'c-rent':['Rent 指数 p','Rent exponent p'],
+    'c-eff':['折叠布局效率','Fold layout efficiency'], 'c-int':['负载运算强度 (FLOP/B)','Load intensity (FLOP/B)'],
+    'c-surf':['3D 表面带宽密度 (TB/s/mm²)','3D surface bw density (TB/s/mm²)'],
+    'c-hbm':['HBM 每栈带宽 (TB/s)','HBM per-stack bw (TB/s)'],
+    'c-ubo':['UB 每消息开销 o (ns)','UB per-msg overhead o (ns)'],
+    'c-uba':['UB 跨机延迟 α (ns)','UB inter-node latency α (ns)'],
+    'c-ubb':['UB+HiONE 带宽 (GB/s)','UB+HiONE bandwidth (GB/s)'], 'c-ngpu':['集群规模','Cluster size'],
+    'c-perturb':['扰动幅度 ±','Perturbation ±'],
+  };
+  const SEL_LABELS = {'c-style':['折叠形态','Fold style'], 'c-cool':['散热场景','Cooling scenario'],
+    'c-wl':['负载','Workload'], 'c-casview':['下方图视图','Lower chart view'],
+    'c-metric':['输出指标','Output metric'], 'c-sweepparam':['1D 扫描参数','1D sweep parameter']};
+  const CHECKS = {'c-ub':['UB 内存语义协议','UB memory-semantic protocol'],
+    'c-hione':['Hi-ONE 光互连带宽','Hi-ONE optical bandwidth'],
+    'c-3df':['3D Folding 供内存 (×2.5)','3D Folding memory (×2.5)'],
+    'c-lf':['LogicFolding 提算力 (×1.6)','LogicFolding compute (×1.6)']};
+  const OPTS = {
+    'c-style':[['逻辑 + 存储（Kirin 形态）','Logic + memory (Kirin)'],['逻辑 + 逻辑（全功率）','Logic + logic (full-power)']],
+    'c-cool':[['移动 · 无源','Mobile · passive'],['AI · 液冷','AI · liquid']],
+    'c-wl':[['训练梯度 AllReduce（大消息）','Training gradient AllReduce (large msg)'],['MoE decode all-to-all（小消息）','MoE decode all-to-all (small msg)']],
+    'c-casview':[['瓶颈迁移 + Amdahl（A/C）','Bottleneck + Amdahl (A/C)'],['十年轨迹（实验 B）','Decade trajectory (exp B)'],['α 口径分解（实验 D）','α decomposition (exp D)']],
+    'c-metric':[['2层折叠频率增益 @1.5μm','2-tier fold freq gain @1.5μm'],['判据反转点 pitch','Criterion flip pitch'],['异构折叠可持续频率','Hetero sustainable freq'],['MoE UB/RDMA 加速比','MoE UB/RDMA speedup'],['级联全开加速比','Full-cascade speedup']],
+  };
+  const H4 = {'h4-dev':['归一化 τ vs 工艺节点（28nm = 1）','Normalized τ vs process node (28nm = 1)'],
+    'h4-devbar':['互连占级延迟比例（%）','Interconnect share of stage delay (%)'],
+    'h4-crit':['折叠判据：τ_Benefit vs τ_Penalty 随键合 pitch（ps）','Folding criterion: τ_Benefit vs τ_Penalty over bond pitch (ps)'],
+    'h4-freq':['频率：电路极限 (burst) vs 热约束下可持续（相对 2D = 1）','Frequency: circuit limit (burst) vs thermal-sustainable (rel. 2D = 1)'],
+    'h4-pkg':['可达算力 vs die/封装等效边长（log-log，TFLOPS）','Achievable compute vs die/pkg equiv. side (log-log, TFLOPS)']};
+
+  function applyStatic() {
+    const g = i => TT(PANEL_TXT[i][0], PANEL_TXT[i][1]);
+    document.querySelector('h1').textContent =
+      TT('τ Scaling 交互式仿真实验台', 'τ Scaling Interactive Simulation Lab');
+    document.querySelector('.subtitle').textContent = TT(
+      '拖动参数，实时重算四层级联模型。模型与仓库 tau_sim/ Python 实现逐位对拍一致（14 项指标误差 0）；参数默认值即论文验证所用的文献校准值。',
+      "Drag the parameters to recompute the four-layer cascade model in real time. The model is bit-for-bit cross-checked against the repo's tau_sim/ Python implementation (14 metrics, 0 error); defaults are the literature-calibrated values used to validate the paper.");
+    const secs = document.querySelectorAll('.wrap > section');
+    secs.forEach((sec, i) => {
+      if (!PANEL_TXT[i]) return;
+      sec.querySelector('.tag').textContent = TT(PANEL_TXT[i][0], PANEL_TXT[i][1]);
+      sec.querySelector('h2').lastChild.nodeValue = TT(PANEL_TXT[i][2], PANEL_TXT[i][3]);
+      sec.querySelector('.desc').textContent = TT(PANEL_TXT[i][4], PANEL_TXT[i][5]);
+    });
+    for (const id in LABELS) {
+      const ctl = $(id) && $(id).closest('.ctl');
+      if (ctl) ctl.querySelector('label').firstChild.nodeValue = TT(LABELS[id][0], LABELS[id][1]) + ' ';
+    }
+    for (const id in SEL_LABELS) {
+      const ctl = $(id) && $(id).closest('.ctl');
+      if (ctl) ctl.querySelector('label').firstChild.nodeValue = TT(SEL_LABELS[id][0], SEL_LABELS[id][1]);
+    }
+    for (const id in CHECKS) {
+      const lab = $(id) && $(id).closest('label');
+      if (lab) lab.lastChild.nodeValue = ' ' + TT(CHECKS[id][0], CHECKS[id][1]);
+    }
+    for (const id in OPTS) {
+      const opts = $(id) && $(id).options;
+      if (opts) OPTS[id].forEach((a, i) => { if (opts[i]) opts[i].textContent = TT(a[0], a[1]); });
+    }
+    for (const id in H4) if ($(id)) $(id).textContent = TT(H4[id][0], H4[id][1]);
+    const sp = $('c-sweepparam');
+    if (sp) [...sp.options].forEach((o, i) => { if (M.PARAMS[i]) o.textContent = trp(M.PARAMS[i].label); });
+    document.querySelector('footer').textContent = TT(
+      'τ Lab · 模型与参数出处见仓库 tau_sim/params.py 与 REPORT.md · 静态报告页为另一 Artifact「τ Scaling 全栈级联仿真验证」',
+      "τ Lab · model & parameter sources in repo tau_sim/params.py and REPORT.md · the static report page is a separate Artifact 'τ Scaling Full-Stack Cascade Simulation'");
+  }
+
   /* ---------- 极简 SVG 折线图（悬停 tooltip + 图例 + 竖标） ---------- */
   function lineChart(el, cfg) {
     const W = 720, H = 240, L = 56, R = 12, T = 26, B = 34;
@@ -867,22 +995,21 @@ if (typeof window !== 'undefined') window.TauModel = M;
     const s0 = d[0];
     lineChart($('ch-dev'), {
       series: [
-        { name: '理想平方律', color: COLORS.muted, dash: true, pts: d.map((x, i) => [i, x.tauSq / s0.tauSq]) },
-        { name: '门本征 FO4', color: COLORS.blue, pts: d.map((x, i) => [i, x.tauInt / s0.tauInt]) },
-        { name: '级延迟(含互连)', color: COLORS.red, pts: d.map((x, i) => [i, x.tauStage / s0.tauStage]) }],
-      xCats: cats, xLabel: '工艺节点', yLabel: '归一化 τ',
+        { name: TT('理想平方律', 'Ideal square-law'), color: COLORS.muted, dash: true, pts: d.map((x, i) => [i, x.tauSq / s0.tauSq]) },
+        { name: TT('门本征 FO4', 'Gate intrinsic FO4'), color: COLORS.blue, pts: d.map((x, i) => [i, x.tauInt / s0.tauInt]) },
+        { name: TT('级延迟(含互连)', 'Stage (w/ wire)'), color: COLORS.red, pts: d.map((x, i) => [i, x.tauStage / s0.tauStage]) }],
+      xCats: cats, xLabel: TT('工艺节点', 'Process node'), yLabel: TT('归一化 τ', 'Normalized τ'),
     });
     barChart($('ch-devbar'), cats, d.map(x => x.wireFrac * 100),
              cats.map(() => COLORS.yellow), '%');
 
-    // 临界节点：级延迟不再下降（相对上一节点回升）的首个节点
     let crit = '—';
     for (let i = 1; i < d.length; i++)
       if (d[i].tauStage >= d[i - 1].tauStage) { crit = d[i].node; break; }
     statTiles($('s-dev'), [
-      { v: (d[d.length - 1].tauStage / s0.tauStage).toFixed(2) + '×', k: '3nm 级延迟 / 28nm（>1 即倒退）', cls: d[d.length - 1].tauStage > s0.tauStage ? 'neg' : '' },
-      { v: Math.round(s0.wireFrac * 100) + '%→' + Math.round(d[d.length - 1].wireFrac * 100) + '%', k: '互连占比 28nm→3nm' },
-      { v: crit, k: '级延迟停止下降的临界节点' },
+      { v: (d[d.length - 1].tauStage / s0.tauStage).toFixed(2) + '×', k: TT('3nm 级延迟 / 28nm（>1 即倒退）', '3nm stage / 28nm (>1 = regress)'), cls: d[d.length - 1].tauStage > s0.tauStage ? 'neg' : '' },
+      { v: Math.round(s0.wireFrac * 100) + '%→' + Math.round(d[d.length - 1].wireFrac * 100) + '%', k: TT('互连占比 28nm→3nm', 'Interconnect share 28nm→3nm') },
+      { v: crit, k: TT('级延迟停止下降的临界节点', 'crossover node where stage stops dropping') },
     ]);
   }
 
@@ -904,9 +1031,9 @@ if (typeof window !== 'undefined') window.TauModel = M;
     }
     lineChart($('ch-criterion'), {
       series: [
-        { name: 'τ_Benefit 收益', color: COLORS.aqua, pts: ben },
-        { name: 'τ_Penalty 代价', color: COLORS.red, pts: pen }],
-      xLabel: '混合键合 pitch (μm)', yLabel: 'ps', markX: pitch, yMin: 0,
+        { name: TT('τ_Benefit 收益', 'τ_Benefit'), color: COLORS.aqua, pts: ben },
+        { name: TT('τ_Penalty 代价', 'τ_Penalty'), color: COLORS.red, pts: pen }],
+      xLabel: TT('混合键合 pitch (μm)', 'Hybrid-bond pitch (μm)'), yLabel: 'ps', markX: pitch, yMin: 0,
     });
 
     const bs = [], ss = [];
@@ -917,18 +1044,18 @@ if (typeof window !== 'undefined') window.TauModel = M;
     }
     lineChart($('ch-freq'), {
       series: [
-        { name: '电路极限 burst', color: COLORS.muted, pts: bs, dash: true },
-        { name: '可持续（热约束）', color: style === 'logic-on-memory' ? COLORS.blue : COLORS.yellow, pts: ss }],
-      xLabel: '折叠层数', yLabel: '相对频率', yMin: 0.5,
+        { name: TT('电路极限 burst', 'Circuit-limit burst'), color: COLORS.muted, pts: bs, dash: true },
+        { name: TT('可持续（热约束）', 'Sustainable (thermal)'), color: style === 'logic-on-memory' ? COLORS.blue : COLORS.yellow, pts: ss }],
+      xLabel: TT('折叠层数', 'Fold tiers'), yLabel: TT('相对频率', 'Rel. freq'), yMin: 0.5,
     });
 
     const ok = f.benefit > f.penalty;
     statTiles($('s-fold'), [
-      { v: (f.wlReduction * 100).toFixed(1) + '%', k: '线长降幅' },
-      { v: (f.freqGain >= 0 ? '+' : '') + (f.freqGain * 100).toFixed(1) + '%', k: '频率增益 (burst)', cls: f.freqGain >= 0 ? 'pos' : 'neg' },
-      { v: f.density.toFixed(0), k: '密度 MTr/mm²' },
-      { v: th.fSustained.toFixed(2) + '×', k: '可持续频率', cls: th.fSustained >= 0.95 ? 'pos' : (th.fSustained < 0.85 ? 'neg' : '') },
-      { v: ok ? '成立' : '反转', k: '判据 τ_B > τ_P（gear ' + f.gear.toFixed(1) + '）', cls: ok ? 'pos' : 'neg' },
+      { v: (f.wlReduction * 100).toFixed(1) + '%', k: TT('线长降幅', 'Wirelength ↓') },
+      { v: (f.freqGain >= 0 ? '+' : '') + (f.freqGain * 100).toFixed(1) + '%', k: TT('频率增益 (burst)', 'Freq gain (burst)'), cls: f.freqGain >= 0 ? 'pos' : 'neg' },
+      { v: f.density.toFixed(0), k: TT('密度 MTr/mm²', 'Density MTr/mm²') },
+      { v: th.fSustained.toFixed(2) + '×', k: TT('可持续频率', 'Sustainable freq'), cls: th.fSustained >= 0.95 ? 'pos' : (th.fSustained < 0.85 ? 'neg' : '') },
+      { v: ok ? TT('成立', 'holds') : TT('反转', 'flips'), k: TT('判据 τ_B > τ_P（gear ' + f.gear.toFixed(1) + '）', 'criterion τ_B > τ_P (gear ' + f.gear.toFixed(1) + ')'), cls: ok ? 'pos' : 'neg' },
     ]);
   }
 
@@ -948,10 +1075,10 @@ if (typeof window !== 'undefined') window.TauModel = M;
     }
     lineChart($('ch-pkg'), {
       series: [
-        { name: '峰值算力 ∝N²', color: COLORS.muted, pts: peak, dash: true },
-        { name: '2.5D 边缘供带宽', color: COLORS.red, pts: edge },
-        { name: '3D Folding 表面', color: COLORS.aqua, pts: surfS }],
-      xLabel: '边长 N (mm)', yLabel: 'TFLOPS', xLog: true, yLog: true,
+        { name: TT('峰值算力 ∝N²', 'Peak compute ∝N²'), color: COLORS.muted, pts: peak, dash: true },
+        { name: TT('2.5D 边缘供带宽', '2.5D edge bandwidth'), color: COLORS.red, pts: edge },
+        { name: TT('3D Folding 表面', '3D Folding surface'), color: COLORS.aqua, pts: surfS }],
+      xLabel: TT('边长 N (mm)', 'side N (mm)'), yLabel: 'TFLOPS', xLog: true, yLog: true,
     });
 
     const p30 = M.pkg(30, surf, hbm);
@@ -962,10 +1089,10 @@ if (typeof window !== 'undefined') window.TauModel = M;
       if (p.peak / p.bwEdge > intensity) { nCross = n; break; }
     }
     statTiles($('s-pkg'), [
-      { v: fmtNum(ridge30), k: '2.5D ridge 强度 @N=30mm (FLOP/B)' },
-      { v: fmtNum(M.COMPUTE_DENSITY / surf), k: '3D ridge 强度（恒定, FLOP/B）' },
-      { v: nCross ? nCross.toFixed(0) + 'mm' : '>200mm', k: '2.5D 访存受限临界边长（当前强度）' },
-      { v: (p30.bwSurf / p30.bwEdge).toFixed(1) + '×', k: '3D/2.5D 带宽比 @N=30mm' },
+      { v: fmtNum(ridge30), k: TT('2.5D ridge 强度 @N=30mm (FLOP/B)', '2.5D ridge @N=30mm (FLOP/B)') },
+      { v: fmtNum(M.COMPUTE_DENSITY / surf), k: TT('3D ridge 强度（恒定, FLOP/B）', '3D ridge (constant, FLOP/B)') },
+      { v: nCross ? nCross.toFixed(0) + 'mm' : '>200mm', k: TT('2.5D 访存受限临界边长（当前强度）', '2.5D mem-bound crit side (current I)') },
+      { v: (p30.bwSurf / p30.bwEdge).toFixed(1) + '×', k: TT('3D/2.5D 带宽比 @N=30mm', '3D/2.5D bw ratio @N=30mm') },
     ]);
   }
 
@@ -983,37 +1110,37 @@ if (typeof window !== 'undefined') window.TauModel = M;
     F.ub_hione.be = ubb; F.ub_hione.bi = ubb;
 
     if (wl === 'train') {
-      $('t-net').textContent = '训练扩展效率 vs 集群规模（大消息 AllReduce）';
+      $('t-net').textContent = TT('训练扩展效率 vs 集群规模（大消息 AllReduce）', 'Training scaling efficiency vs cluster size (large-msg AllReduce)');
       const mk = (fab) => { const pts = []; for (let e = 3; e <= 14; e++) { const n = Math.pow(2, e); pts.push([n, M.trainEff(n, fab) * 100]); } return pts; };
       lineChart($('ch-net'), {
         series: [
-          { name: 'TCP/IP 栈', color: COLORS.red, pts: mk(F.legacy_tcp) },
+          { name: TT('TCP/IP 栈', 'TCP/IP stack'), color: COLORS.red, pts: mk(F.legacy_tcp) },
           { name: 'RDMA/IB', color: COLORS.yellow, pts: mk(F.legacy_rdma) },
           { name: 'UB+HiONE', color: COLORS.aqua, pts: mk(F.ub_hione) }],
-        xLabel: 'GPU/NPU 数', yLabel: '扩展效率 %', xLog: true, yMin: 0,
+        xLabel: TT('GPU/NPU 数', 'GPU/NPU count'), yLabel: TT('扩展效率 %', 'Scaling eff %'), xLog: true, yMin: 0,
       });
       statTiles($('s-net'), [
-        { v: (M.trainEff(16384, F.legacy_tcp) * 100).toFixed(0) + '%', k: 'TCP @16k 卡', cls: 'neg' },
-        { v: (M.trainEff(16384, F.legacy_rdma) * 100).toFixed(0) + '%', k: 'RDMA @16k 卡' },
-        { v: (M.trainEff(16384, F.ub_hione) * 100).toFixed(0) + '%', k: 'UB+HiONE @16k 卡', cls: 'pos' },
+        { v: (M.trainEff(16384, F.legacy_tcp) * 100).toFixed(0) + '%', k: TT('TCP @16k 卡', 'TCP @16k'), cls: 'neg' },
+        { v: (M.trainEff(16384, F.legacy_rdma) * 100).toFixed(0) + '%', k: TT('RDMA @16k 卡', 'RDMA @16k') },
+        { v: (M.trainEff(16384, F.ub_hione) * 100).toFixed(0) + '%', k: TT('UB+HiONE @16k 卡', 'UB+HiONE @16k'), cls: 'pos' },
       ]);
     } else {
-      $('t-net').textContent = 'MoE decode 每步时间 vs 专家并行规模（小消息，log）';
+      $('t-net').textContent = TT('MoE decode 每步时间 vs 专家并行规模（小消息，log）', 'MoE decode step time vs expert-parallel size (small-msg, log)');
       const mk = (fab) => { const pts = []; for (let e = 3; e <= 8; e++) { const n = Math.pow(2, e); pts.push([n, M.moeStep(n, fab) * 1e3]); } return pts; };
       lineChart($('ch-net'), {
         series: [
-          { name: 'TCP/IP 栈', color: COLORS.red, pts: mk(F.legacy_tcp) },
+          { name: TT('TCP/IP 栈', 'TCP/IP stack'), color: COLORS.red, pts: mk(F.legacy_tcp) },
           { name: 'RDMA/IB', color: COLORS.yellow, pts: mk(F.legacy_rdma) },
-          { name: 'UB 协议（同 400G 线）', color: COLORS.blue, pts: mk(F.ub_protocol) }],
-        xLabel: '专家并行规模', yLabel: 'ms/步', xLog: true, yLog: true,
+          { name: TT('UB 协议（同 400G 线）', 'UB protocol (same 400G)'), color: COLORS.blue, pts: mk(F.ub_protocol) }],
+        xLabel: TT('专家并行规模', 'Expert-parallel size'), yLabel: TT('ms/步', 'ms/step'), xLog: true, yLog: true,
       });
       const r = M.moeStep(128, F.legacy_rdma), u = M.moeStep(128, F.ub_protocol),
         t = M.moeStep(128, F.legacy_tcp);
       statTiles($('s-net'), [
-        { v: (t * 1e3).toFixed(0) + 'ms', k: 'TCP @128 卡', cls: 'neg' },
-        { v: (r * 1e3).toFixed(1) + 'ms', k: 'RDMA @128 卡' },
-        { v: (u * 1e3).toFixed(2) + 'ms', k: 'UB @128 卡', cls: 'pos' },
-        { v: (r / u).toFixed(1) + '× / ' + (t / u).toFixed(0) + '×', k: 'UB 相对 RDMA / TCP 加速' },
+        { v: (t * 1e3).toFixed(0) + 'ms', k: TT('TCP @128 卡', 'TCP @128'), cls: 'neg' },
+        { v: (r * 1e3).toFixed(1) + 'ms', k: TT('RDMA @128 卡', 'RDMA @128') },
+        { v: (u * 1e3).toFixed(2) + 'ms', k: TT('UB @128 卡', 'UB @128'), cls: 'pos' },
+        { v: (r / u).toFixed(1) + '× / ' + (t / u).toFixed(0) + '×', k: TT('UB 相对 RDMA / TCP 加速', 'UB speedup vs RDMA / TCP') },
       ]);
     }
   }
@@ -1028,7 +1155,7 @@ if (typeof window !== 'undefined') window.TauModel = M;
     const base = M.iterationTau(n, 'legacy_tcp', 1, 1, 1);
     const cur = M.iterationTau(n, fab, kC, kM, 1);
     const keys = ['compute', 'memory', 'comm', 'other'];
-    const names = ['计算', '访存', '通信', '其他'];
+    const names = keys.map(k => LN()[k]);
     const cols = [COLORS.blue, COLORS.yellow, COLORS.red, COLORS.muted];
     const t0 = keys.reduce((a, k) => a + cur[k], 0);
     const dom = keys.reduce((a, b) => cur[a] > cur[b] ? a : b);
@@ -1039,10 +1166,10 @@ if (typeof window !== 'undefined') window.TauModel = M;
     if (view === 'bottleneck') {
       amdahlWrap.style.display = '';
       $('wrap-stack').querySelector('h4').textContent =
-        '迭代 τ 构成：基线（传统协议栈） vs 当前配置（秒）';
+        TT('迭代 τ 构成：基线（传统协议栈） vs 当前配置（秒）', 'Iteration τ composition: baseline (legacy stack) vs current (s)');
       stackChart($('ch-stack'), [
-        { label: '基线', vals: keys.map(k => base[k]) },
-        { label: '当前配置', vals: keys.map(k => cur[k]) },
+        { label: TT('基线', 'Baseline'), vals: keys.map(k => base[k]) },
+        { label: TT('当前配置', 'Current'), vals: keys.map(k => cur[k]) },
       ], cols, names);
       const series = keys.map((k, i) => {
         const pts = [];
@@ -1051,51 +1178,51 @@ if (typeof window !== 'undefined') window.TauModel = M;
           const parts = { ...cur }; parts[k] = cur[k] / kk;
           pts.push([kk, t0 / keys.reduce((a, q) => a + parts[q], 0)]);
         }
-        return { name: '只加速' + names[i], color: cols[i], pts };
+        return { name: TT('只加速', 'Speed up ') + names[i] + TT('', ' only'), color: cols[i], pts };
       });
       lineChart($('ch-amdahl'), {
-        series, xLabel: '单层 τ 压缩倍数', yLabel: '系统加速', xLog: true, yMin: 1,
+        series, xLabel: TT('单层 τ 压缩倍数', 'Single-layer τ compression'), yLabel: TT('系统加速', 'System speedup'), xLog: true, yMin: 1,
       });
       statTiles($('s-cas'), [
-        { v: t0.toFixed(2) + 's', k: '当前迭代 τ' },
-        { v: (tb / t0).toFixed(2) + '×', k: '相对基线加速', cls: tb / t0 > 1.01 ? 'pos' : '' },
-        { v: names[keys.indexOf(dom)], k: '主导 τ 层 = 下一个投资方向' },
-        { v: (cur[dom] / t0 * 100).toFixed(0) + '%', k: '主导层占比（Amdahl 上限 ' + (1 / (1 - cur[dom] / t0)).toFixed(1) + '×）' },
+        { v: t0.toFixed(2) + 's', k: TT('当前迭代 τ', 'Current iteration τ') },
+        { v: (tb / t0).toFixed(2) + '×', k: TT('相对基线加速', 'Speedup vs baseline'), cls: tb / t0 > 1.01 ? 'pos' : '' },
+        { v: names[keys.indexOf(dom)], k: TT('主导 τ 层 = 下一个投资方向', 'Dominant τ layer = next investment') },
+        { v: (cur[dom] / t0 * 100).toFixed(0) + '%', k: TT('主导层占比（Amdahl 上限 ' + (1 / (1 - cur[dom] / t0)).toFixed(1) + '×）', 'Dominant share (Amdahl ceiling ' + (1 / (1 - cur[dom] / t0)).toFixed(1) + '×)') },
       ]);
     } else if (view === 'decade') {
       amdahlWrap.style.display = 'none';
       $('wrap-stack').querySelector('h4').textContent =
-        '级联实验 B · 十年系统 τ 轨迹（归一化, log）——单点优化饱和 vs 全栈协同';
+        TT('级联实验 B · 十年系统 τ 轨迹（归一化, log）——单点优化饱和 vs 全栈协同', 'Cascade B · ten-year system τ (normalized, log) — single-point saturates vs full-stack');
       const d = M.decadeTrajectories(n);
       const palette = [COLORS.red, COLORS.yellow, COLORS.aqua];
       lineChart($('ch-stack'), {
         series: d.series.map((s, i) => ({
-          name: `${s.name} (α≈${s.alpha.toFixed(2)})`, color: palette[i],
+          name: `${trt(s.name)} (α≈${s.alpha.toFixed(2)})`, color: palette[i],
           pts: s.pts.map((v, y) => [y, v]),
         })),
-        xLabel: '年', yLabel: '系统 τ (归一化)', yLog: true,
+        xLabel: TT('年', 'Year'), yLabel: TT('系统 τ (归一化)', 'System τ (normalized)'), yLog: true,
       });
       statTiles($('s-cas'), d.series.map((s, i) => ({
-        v: 'α≈' + s.alpha.toFixed(2), k: s.name + '（十年 ' + (1 / s.pts[s.pts.length - 1]).toFixed(1) + '×）',
+        v: 'α≈' + s.alpha.toFixed(2), k: trt(s.name) + TT('（十年 ', ' (decade ') + (1 / s.pts[s.pts.length - 1]).toFixed(1) + TT('×）', '×)'),
         cls: i === 2 ? 'pos' : '',
       })));
     } else {  // alpha
       amdahlWrap.style.display = 'none';
       $('wrap-stack').querySelector('h4').textContent =
-        '级联实验 D · α≈10/年 的口径分解（年化倍率）';
+        TT('级联实验 D · α≈10/年 的口径分解（年化倍率）', 'Cascade D · α≈10/yr accounting decomposition (annualized)');
       const a = M.alphaDecomp();
-      const cats = ['集成规模\nα_scale', '单芯片\nα_chip',
-        'α_eff\n(τ-first)', 'α_eff\n(legacy)', '精度/数制\n(模型外)'];
+      const cats = [TT('集成规模\nα_scale', 'Integration\nα_scale'), TT('单芯片\nα_chip', 'Per-chip\nα_chip'),
+        'α_eff\n(τ-first)', 'α_eff\n(legacy)', TT('精度/数制\n(模型外)', 'Precision\n(out of model)')];
       const vals = [M.ALPHA_SCALE, M.ALPHA_CHIP, a.tau_first.alphaEff,
         a.legacy.alphaEff, M.ALPHA_PRECISION];
       const bcols = [style_seq(1), style_seq(2), COLORS.aqua, COLORS.red, COLORS.muted];
-      barChart($('ch-stack'), cats, vals, bcols, '×', 1.0, '基线 1.0×');
+      barChart($('ch-stack'), cats, vals, bcols, '×', 1.0, TT('基线 1.0×', 'baseline 1.0×'));
       const prodTau = M.ALPHA_SCALE * M.ALPHA_CHIP * a.tau_first.alphaEff;
       statTiles($('s-cas'), [
-        { v: a.tau_first.alphaTotal.toFixed(2) + '/年', k: 'τ-first 硬件三因子 α', cls: 'pos' },
-        { v: a.legacy.alphaTotal.toFixed(2) + '/年', k: 'legacy（效率坍塌）α', cls: 'neg' },
-        { v: a.tau_first.capability[a.tau_first.capability.length - 1].toFixed(0) + '×', k: 'τ-first 十年能力' },
-        { v: (prodTau * M.ALPHA_PRECISION).toFixed(1) + '×', k: '叠加精度演进（论文 10× 还需算法因子）' },
+        { v: a.tau_first.alphaTotal.toFixed(2) + TT('/年', '/yr'), k: TT('τ-first 硬件三因子 α', 'τ-first 3-hardware-factor α'), cls: 'pos' },
+        { v: a.legacy.alphaTotal.toFixed(2) + TT('/年', '/yr'), k: TT('legacy（效率坍塌）α', 'legacy (eff collapse) α'), cls: 'neg' },
+        { v: a.tau_first.capability[a.tau_first.capability.length - 1].toFixed(0) + '×', k: TT('τ-first 十年能力', 'τ-first decade capability') },
+        { v: (prodTau * M.ALPHA_PRECISION).toFixed(1) + '×', k: TT('叠加精度演进（论文 10× 还需算法因子）', 'with precision (α≈10 needs algo factors)') },
       ]);
     }
   }
@@ -1111,10 +1238,10 @@ if (typeof window !== 'undefined') window.TauModel = M;
     const pad = (v1 - v0) * 0.12 || 1; v0 -= pad; v1 += pad;
     const px = v => L + (v - v0) / (v1 - v0) * (W - L - R);
     let g = `<line x1="${px(data.base)}" y1="${T}" x2="${px(data.base)}" y2="${H - 26}" stroke="#898781" stroke-width="1" stroke-dasharray="3 3"/>`;
-    g += `<text x="${px(data.base)}" y="${H - 12}" text-anchor="middle" font-size="10" fill="#52514e">基线 ${fmtNum(data.base)}${unit}</text>`;
+    g += `<text x="${px(data.base)}" y="${H - 12}" text-anchor="middle" font-size="10" fill="#52514e">${TT('基线','baseline')} ${fmtNum(data.base)}${unit}</text>`;
     rows.forEach((r, i) => {
       const y = T + i * (BH + GAP);
-      g += `<text x="${L - 8}" y="${y + BH / 2 + 3.5}" text-anchor="end" font-size="11" fill="#52514e">${r.label}</text>`;
+      g += `<text x="${L - 8}" y="${y + BH / 2 + 3.5}" text-anchor="end" font-size="11" fill="#52514e">${trp(r.label)}</text>`;
       const seg = (v, col) => {
         const a = Math.min(px(v), px(data.base)), w = Math.abs(px(v) - px(data.base));
         return `<rect x="${a}" y="${y}" width="${Math.max(w, 1)}" height="${BH}" rx="2" fill="${col}" fill-opacity="0.85"><title>${fmtNum(v)}${unit}</title></rect>`;
@@ -1123,15 +1250,15 @@ if (typeof window !== 'undefined') window.TauModel = M;
       const ext = Math.abs(px(r.hi) - px(data.base)) > Math.abs(px(r.lo) - px(data.base)) ? r.hi : r.lo;
       g += `<text x="${px(ext) + (px(ext) > px(data.base) ? 5 : -5)}" y="${y + BH / 2 + 3.5}" text-anchor="${px(ext) > px(data.base) ? 'start' : 'end'}" font-size="10" font-family="ui-monospace,monospace" fill="#52514e">${fmtNum(r.lo)} ~ ${fmtNum(r.hi)}</text>`;
     });
-    g += `<rect x="${L}" y="${H - 24}" width="10" height="10" rx="2" fill="${COLORS.blue}"/><text x="${L + 14}" y="${H - 15}" font-size="10.5" fill="#52514e">参数 −扰动</text>`;
-    g += `<rect x="${L + 100}" y="${H - 24}" width="10" height="10" rx="2" fill="${COLORS.yellow}"/><text x="${L + 114}" y="${H - 15}" font-size="10.5" fill="#52514e">参数 +扰动</text>`;
+    g += `<rect x="${L}" y="${H - 24}" width="10" height="10" rx="2" fill="${COLORS.blue}"/><text x="${L + 14}" y="${H - 15}" font-size="10.5" fill="#52514e">${TT('参数 −扰动','param −pert')}</text>`;
+    g += `<rect x="${L + 110}" y="${H - 24}" width="10" height="10" rx="2" fill="${COLORS.yellow}"/><text x="${L + 124}" y="${H - 15}" font-size="10.5" fill="#52514e">${TT('参数 +扰动','param +pert')}</text>`;
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
   }
 
   const selP = $('c-sweepparam');
   M.PARAMS.forEach(p => {
     const o = document.createElement('option');
-    o.value = p.id; o.textContent = p.label;
+    o.value = p.id; o.textContent = trp(p.label);
     selP.appendChild(o);
   });
 
@@ -1141,17 +1268,21 @@ if (typeof window !== 'undefined') window.TauModel = M;
     $('v-perturb').textContent = $('c-perturb').value + '%';
     const met = M.METRICS[mid];
     const data = M.tornado(mid, s);
-    $('t-tornado').textContent = `龙卷风图：${met.label}（${met.unit}），参数 ±${(s * 100).toFixed(0)}%`;
+    $('t-tornado').textContent = TT(
+      `龙卷风图：${trm(met.label)}（${met.unit}），参数 ±${(s * 100).toFixed(0)}%`,
+      `Tornado: ${trm(met.label)} (${met.unit}), params ±${(s * 100).toFixed(0)}%`);
     tornadoChart($('ch-tornado'), data, met.unit);
 
     const pid = selP.value || M.PARAMS[0].id;
     const sw = M.sweep1d(mid, pid, 31);
-    const pLabel = M.PARAMS.find(x => x.id === pid).label;
-    $('t-sweep').textContent = `1D 扫描：${pLabel} × 0.5~1.5（红色区 = ${met.flipDesc}）`;
+    const pLabel = trp(M.PARAMS.find(x => x.id === pid).label);
+    $('t-sweep').textContent = TT(
+      `1D 扫描：${pLabel} × 0.5~1.5（红色区 = ${trf(met.flipDesc)}）`,
+      `1D sweep: ${pLabel} × 0.5–1.5 (red = ${trf(met.flipDesc)})`);
     // 翻转区间（连续段）
     lineChart($('ch-sweep'), {
-      series: [{ name: met.label, color: COLORS.blue, pts: sw.pts.map(p => [p[0], p[1]]) }],
-      xLabel: pLabel + '（相对基线倍数）', yLabel: met.unit, markX: 1.0,
+      series: [{ name: trm(met.label), color: COLORS.blue, pts: sw.pts.map(p => [p[0], p[1]]) }],
+      xLabel: pLabel + TT('（相对基线倍数）', ' (× baseline)'), yLabel: met.unit, markX: 1.0,
     });
     // 叠加翻转区着色
     const svg = $('ch-sweep').querySelector('svg');
@@ -1174,10 +1305,10 @@ if (typeof window !== 'undefined') window.TauModel = M;
     const nFlip = sw.pts.filter(p => p[2]).length;
     const top = data.rows[0];
     statTiles($('s-sens'), [
-      { v: fmtNum(data.base) + met.unit, k: '基线指标值' },
-      { v: top.label, k: '最敏感参数（摆幅 ' + fmtNum(top.span) + met.unit + '）' },
-      { v: nFlip ? (nFlip / sw.pts.length * 100).toFixed(0) + '%' : '无',
-        k: '当前 1D 扫描区间内的翻转占比', cls: nFlip ? 'neg' : 'pos' },
+      { v: fmtNum(data.base) + met.unit, k: TT('基线指标值', 'Baseline value') },
+      { v: trp(top.label), k: TT('最敏感参数（摆幅 ' + fmtNum(top.span) + met.unit + '）', 'Most sensitive param (swing ' + fmtNum(top.span) + met.unit + ')') },
+      { v: nFlip ? (nFlip / sw.pts.length * 100).toFixed(0) + '%' : TT('无', 'none'),
+        k: TT('当前 1D 扫描区间内的翻转占比', 'Flip fraction in current 1D range'), cls: nFlip ? 'neg' : 'pos' },
     ]);
   }
 
@@ -1189,5 +1320,18 @@ if (typeof window !== 'undefined') window.TauModel = M;
   bind(['c-wl', 'c-ubo', 'c-uba', 'c-ubb'], panel3);
   bind(['c-ub', 'c-hione', 'c-3df', 'c-lf', 'c-ngpu', 'c-casview'], panel4);
   bind(['c-metric', 'c-perturb', 'c-sweepparam'], panel5);
+
+  /* 语言切换 */
+  function renderAll() { panel0(); panel1(); panel2(); panel3(); panel4(); panel5(); }
+  document.querySelectorAll('.langtoggle button').forEach(b =>
+    b.addEventListener('click', () => {
+      LANG = b.dataset.l;
+      document.querySelectorAll('.langtoggle button').forEach(x =>
+        x.classList.toggle('active', x.dataset.l === LANG));
+      document.documentElement.setAttribute('lang', LANG === 'zh' ? 'zh-CN' : 'en');
+      applyStatic();
+      renderAll();
+    }));
+  applyStatic();
 })();
 </script>

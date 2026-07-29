@@ -1,15 +1,17 @@
-"""把 REPORT.md 与 figures/ 的 10 张图合并成一个图文并茂的报告。
+"""把 REPORT.md/.en.md 与图合并成中英双语可切换的图文报告。
+Merge REPORT.md/.en.md with figures into one bilingual (中/EN) illustrated report.
 
-产物（均自包含、无外部依赖）：
-  report_full.html  — 渲染后的完整报告，图以 base64 内嵌，浏览器直接打开
-  report_full.pdf   — 由 Chromium 打印 report_full.html 得到（可选，需 Playwright）
+产物 / outputs (self-contained, no external deps):
+  report_full.html  — 双语可切换，中文用 figures/、英文用 figures_en/，图 base64 内嵌
+  report_full.pdf   — 由 Chromium 打印（中文视图）
 
-用法:
-  python build_report.py            # 生成 html + pdf
-  python build_report.py --html     # 只生成 html
+用法 / usage:
+  python build_report.py            # html + pdf
+  python build_report.py --html     # html only
 """
 
 import base64
+import json
 import os
 import sys
 
@@ -17,7 +19,6 @@ import markdown as md
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# 每张图的说明（按被引用小节顺序插入）
 CAPTIONS = {
     "fig1_device_scaling.png":
         "图 1 · 器件层：几何缩放的 τ 收益逐代衰减，互连占级延迟比例 22%→72%",
@@ -40,26 +41,60 @@ CAPTIONS = {
     "fig10_alpha_decomposition.png":
         "图 10 · 级联实验 D：论文 AI 侧 α≈10/年 的口径分解",
 }
+CAPTIONS_EN = {
+    "fig1_device_scaling.png":
+        "Fig 1 · Device layer: τ gain from geometric scaling decays; interconnect share of stage delay 22%→72%",
+    "fig2_fold_criterion.png":
+        "Fig 2 · Circuit layer: folding criterion — τ_Benefit vs τ_Penalty crossing over hybrid-bond pitch",
+    "fig3_fold_gains.png":
+        "Fig 3 · Circuit layer: LogicFolding gains, model (independent literature) vs Kirin 2026 measured",
+    "fig4_fanout_dilemma.png":
+        "Fig 4 · Package layer: N²-vs-N fan-out dilemma — achievable-compute divergence and 2.5D ridge rise",
+    "fig5_cluster_scaling.png":
+        "Fig 5 · System layer: cluster scaling efficiency (large msg) and MoE small-msg latency; hollow squares are SimPy discrete-event validation points",
+    "fig6_amdahl_saturation.png":
+        "Fig 6 · Cascade A: Amdahl saturation of single-layer optimization; dashed = per-layer speedup ceiling",
+    "fig7_decade_trajectories.png":
+        "Fig 7 · Cascade B: ten-year evolution — single-point saturates vs full-stack τ-first sustains annual α",
+    "fig8_bottleneck_migration.png":
+        "Fig 8 · Cascade C: bottleneck migration — each step shifts the dominant τ layer",
+    "fig9_thermal_constraint.png":
+        "Fig 9 · Thermal constraint: sustainable frequency and ΔT composition of multi-tier folding (paper open problem §6)",
+    "fig10_alpha_decomposition.png":
+        "Fig 10 · Cascade D: accounting decomposition of the paper's AI-side α≈10/yr",
+}
 
 
-def data_uri(fname: str) -> str:
-    with open(os.path.join(HERE, "figures", fname), "rb") as f:
+def data_uri(fname: str, figdir: str) -> str:
+    with open(os.path.join(HERE, figdir, fname), "rb") as f:
         return "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
 
-def inject_figures(md_text: str) -> str:
-    """在每张图被引用的那一行之后，插入内嵌的 <figure> 块。"""
+def inject_figures(md_text: str, figdir: str = "figures",
+                   captions: dict = CAPTIONS) -> str:
+    """在每张图被引用的那一行之后，插入内嵌的 <figure> 块（图取自 figdir）。"""
     out = []
     for line in md_text.splitlines():
         out.append(line)
-        for fname, cap in CAPTIONS.items():           # 保持 fig1..fig10 顺序
+        for fname, cap in captions.items():
             if fname in line:
                 out.append("")
                 out.append(
-                    f'<figure>\n<img src="{data_uri(fname)}" alt="{cap}">\n'
+                    f'<figure>\n<img src="{data_uri(fname, figdir)}" alt="{cap}">\n'
                     f'<figcaption>{cap}</figcaption>\n</figure>')
                 out.append("")
     return "\n".join(out)
+
+
+def render_body(md_path: str, figdir: str, captions: dict) -> str:
+    with open(os.path.join(HERE, md_path), encoding="utf-8") as f:
+        src = f.read()
+    src = inject_figures(src, figdir, captions)
+    body = md.markdown(src, extensions=[
+        "tables", "fenced_code", "sane_lists", "toc", "attr_list"])
+    body = body.replace("<table>", '<div class="table-wrap"><table>')
+    body = body.replace("</table>", "</table></div>")
+    return body
 
 
 CSS = """
@@ -102,45 +137,70 @@ figcaption{margin-top:9px;font-size:12px;color:var(--muted);
   font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.55;text-align:center;}
 hr{border:none;border-top:1px solid var(--line);margin:26px 0;}
 .doc-meta{color:var(--muted);font-size:12.5px;margin:2px 0 0;}
+.lang-block{display:none;}
+:root[data-lang="zh"] .lang-zh{display:block;}
+:root[data-lang="en"] .lang-en{display:block;}
+.langtoggle{position:fixed;top:14px;right:16px;z-index:100;display:flex;
+  border:1px solid var(--line);border-radius:7px;overflow:hidden;background:#fff;
+  box-shadow:0 1px 5px rgba(0,0,0,.12);font-size:13px;}
+.langtoggle button{border:none;background:#fff;padding:6px 14px;cursor:pointer;
+  color:var(--ink2);font:inherit;}
+.langtoggle button.active{background:var(--accent);color:#fff;}
 @media print{
   body{background:#fff;font-size:11.5px;}
   .page{box-shadow:none;margin:0;max-width:none;padding:0 6mm;}
-  h2{break-before:auto;}
+  .langtoggle{display:none;}
   figure,table,pre,blockquote{break-inside:avoid;}
   h1,h2,h3,h4{break-after:avoid;}
   a{color:var(--ink);text-decoration:none;}
 }
 """
 
-TEMPLATE = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+_PAGE = """<!doctype html><html lang="zh-CN" data-lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{title}</title><style>{css}</style></head>
-<body><div class="page">{body}</div></body></html>"""
+<title>{title_zh}</title><style>{css}</style></head>
+<body>
+<div class="langtoggle" role="group" aria-label="language">
+  <button data-l="zh" class="active">中文</button><button data-l="en">EN</button>
+</div>
+<div class="page">
+  <div class="lang-block lang-zh">{body_zh}</div>
+  <div class="lang-block lang-en">{body_en}</div>
+</div>
+<script>
+(function(){{
+  var TITLE={{zh:{title_zh_j},en:{title_en_j}}},root=document.documentElement;
+  function set(l){{root.setAttribute('data-lang',l);root.setAttribute('lang',l==='zh'?'zh-CN':'en');
+    document.title=TITLE[l];
+    document.querySelectorAll('.langtoggle button').forEach(function(b){{
+      b.classList.toggle('active',b.dataset.l===l);}});}}
+  document.querySelectorAll('.langtoggle button').forEach(function(b){{
+    b.addEventListener('click',function(){{set(b.dataset.l);}});}});
+  set('zh');
+}})();
+</script>
+</body></html>"""
 
 
-def build_html() -> str:
-    with open(os.path.join(HERE, "REPORT.md"), encoding="utf-8") as f:
-        src = f.read()
-    src = inject_figures(src)
-    body = md.markdown(src, extensions=[
-        "tables", "fenced_code", "sane_lists", "toc", "attr_list"])
-    # 表格加横向滚动容器（长表在窄屏/打印时可读）
-    body = body.replace("<table>", '<div class="table-wrap"><table>')
-    body = body.replace("</table>", "</table></div>")
-    html = TEMPLATE.format(title="τ Scaling 全栈级联仿真验证报告",
-                           css=CSS, body=body)
-    out = os.path.join(HERE, "report_full.html")
+def build_bilingual(zh_md, en_md, title_zh, title_en, out_name):
+    body_zh = render_body(zh_md, "figures", CAPTIONS)
+    body_en = render_body(en_md, "figures_en", CAPTIONS_EN)
+    html = _PAGE.format(css=CSS, body_zh=body_zh, body_en=body_en,
+                        title_zh=title_zh, title_en=title_en,
+                        title_zh_j=json.dumps(title_zh, ensure_ascii=False),
+                        title_en_j=json.dumps(title_en, ensure_ascii=False))
+    out = os.path.join(HERE, out_name)
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"written {out} ({os.path.getsize(out)/1e6:.1f} MB)")
     return out
 
 
-def build_pdf(html_path: str) -> None:
+def build_pdf(html_path: str, out_name="report_full.pdf") -> None:
     import glob
     from playwright.sync_api import sync_playwright
     exe = glob.glob("/opt/pw-browsers/chromium-*/chrome-linux/chrome")
-    pdf = os.path.join(HERE, "report_full.pdf")
+    pdf = os.path.join(HERE, out_name)
     with sync_playwright() as pw:
         b = pw.chromium.launch(executable_path=exe[0] if exe else None)
         pg = b.new_page()
@@ -153,6 +213,10 @@ def build_pdf(html_path: str) -> None:
 
 
 if __name__ == "__main__":
-    html_path = build_html()
+    html_path = build_bilingual(
+        "REPORT.md", "REPORT.en.md",
+        "τ Scaling 全栈级联仿真验证报告",
+        "τ Scaling — Full-Stack Cascade Simulation Report",
+        "report_full.html")
     if "--html" not in sys.argv:
         build_pdf(html_path)
