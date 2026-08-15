@@ -111,4 +111,5 @@ figures/  figures_en/     # generated figures (Chinese / English label sets)
 REPORT.md   REPORT.en.md  # full analysis report (reading of the paper + results + limits)
 CRITIQUE.md CRITIQUE.en.md# adversarial appendix (assumptions most open to challenge)
 ARCHITECTURE.md           # architecture and development guide
+CHANGELOG.md              # release history (each entry flags whether conclusions changed)
 ```
