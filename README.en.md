@@ -112,4 +112,5 @@ REPORT.md   REPORT.en.md  # full analysis report (reading of the paper + results
 CRITIQUE.md CRITIQUE.en.md# adversarial appendix (assumptions most open to challenge)
 ARCHITECTURE.md           # architecture and development guide
 CHANGELOG.md              # release history (each entry flags whether conclusions changed)
+ROADMAP.md                # open work (separates this simulation's debts from the paper's open questions)
 ```

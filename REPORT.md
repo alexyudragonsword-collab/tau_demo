@@ -234,11 +234,18 @@ capability = N_chips (α_scale=1.58) × per_chip (α_chip=1.25) × 扩展效率 
 | `tau_sim/layer4_system.py` | P4：α-β 集合通信 + SimPy DES |
 | `tau_sim/cascade.py` | P5：级联实验 A/B/C/D |
 | `tau_sim/thermal.py` | 热约束：多层折叠可持续频率 |
-| `run_all.py` | 一键生成 figures/fig1–fig10 |
+| `run_all.py` | 一键生成 figures/fig1–fig10（`--lang en` 出 figures_en/） |
 | `sensitivity.py` | 敏感性检查（17 项，脚本式） |
-| `build_dashboard.py` + `dashboard_template.html` | 生成自包含静态报告页 dashboard.html |
-| `app.py` | Streamlit 交互式 GUI（6 tab，复用全部模型 + SimPy DES + 敏感性龙卷风） |
-| `tau_lab_model.js` + `tau_lab_template.html` + `build_tau_lab.py` | 生成浏览器版 `tau_lab.html`（零依赖单文件：四模型交互 + 敏感性扫描，JS 与 Python 逐位对拍一致） |
+| `tests/test_regression.py` | 14 组黄金值，锁定本报告中每个关键数字 |
+| `tests/test_crosscheck.py` | JS 移植 vs Python 基线 22 项对拍（rtol=1e-6） |
+| `app.py` | Streamlit 交互式 GUI（7 tab，复用全部模型 + SimPy DES + 敏感性龙卷风） |
+| `tau_lab_model.js` + `tau_lab_template.html` + `build_tau_lab.py` | 生成浏览器版 `tau_lab.html`（零依赖单文件：6 个交互面板 + 敏感性扫描，JS 与 Python 逐位对拍一致） |
+| `build_dashboard.py` + `dashboard_template.html`(+`.en.html`) | 生成自包含静态报告页 dashboard.html（中英双语） |
+| `build_report.py` / `build_critique.py` | 生成图文并茂的 report_full.html/.pdf 与 critique.html |
+| `build_slides.js` | 生成 8 页管理层汇报 slides_tau_scaling.pptx |
+| `CRITIQUE.md`(+`.en.md`) | 对抗性附录：论文最易受质疑的假设与结论 |
+| `ARCHITECTURE.md` / `CLAUDE.md` | 架构与开发指南 / 会话级项目约定 |
+| `CHANGELOG.md` / `ROADMAP.md` | 版本演进（标注结论影响） / 待办与未来工作 |
 
 > 说明：交互式 GUI（`tau_lab.html`、`app.py`）与静态报告页仅改变呈现形式，
 > 所用模型、参数、结论与本报告完全一致，不引入任何新的科学主张。

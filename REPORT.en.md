@@ -234,11 +234,18 @@ Applying ±50%-order perturbations to 17 sets of key parameters (Rent exponent, 
 | `tau_sim/layer4_system.py` | P4: α-β collective communication + SimPy DES |
 | `tau_sim/cascade.py` | P5: cascade experiments A/B/C/D |
 | `tau_sim/thermal.py` | Thermal constraint: sustainable frequency of multi-layer folding |
-| `run_all.py` | One-click generation of figures/fig1–fig10 |
+| `run_all.py` | One-click generation of figures/fig1–fig10 (`--lang en` emits figures_en/) |
 | `sensitivity.py` | Sensitivity check (17 items, script-style) |
-| `build_dashboard.py` + `dashboard_template.html` | Generates the self-contained static report page dashboard.html |
-| `app.py` | Streamlit interactive GUI (6 tabs, reusing all models + SimPy DES + sensitivity tornado) |
-| `tau_lab_model.js` + `tau_lab_template.html` + `build_tau_lab.py` | Generates the browser version `tau_lab.html` (zero-dependency single file: four-model interaction + sensitivity sweep, JS bit-for-bit matched against Python) |
+| `tests/test_regression.py` | 14 golden-value groups locking every key number in this report |
+| `tests/test_crosscheck.py` | JS port vs Python baseline, 22 metrics (rtol=1e-6) |
+| `app.py` | Streamlit interactive GUI (7 tabs, reusing all models + SimPy DES + sensitivity tornado) |
+| `tau_lab_model.js` + `tau_lab_template.html` + `build_tau_lab.py` | Generates the browser version `tau_lab.html` (zero-dependency single file: 6 interactive panels + sensitivity sweep, JS bit-for-bit matched against Python) |
+| `build_dashboard.py` + `dashboard_template.html`(+`.en.html`) | Generates the self-contained static report page dashboard.html (bilingual) |
+| `build_report.py` / `build_critique.py` | Generate the illustrated report_full.html/.pdf and critique.html |
+| `build_slides.js` | Generates the 8-slide deck slides_tau_scaling.pptx |
+| `CRITIQUE.md`(+`.en.md`) | Adversarial appendix: assumptions and conclusions most open to challenge |
+| `ARCHITECTURE.md` / `CLAUDE.md` | Architecture & development guide / session-level project conventions |
+| `CHANGELOG.md` / `ROADMAP.md` | Release history (flagging conclusion impact) / open work |
 
 > Note: the interactive GUIs (`tau_lab.html`, `app.py`) and the static report page only change the form of presentation;
 > the models, parameters, and conclusions used are identical to this report and introduce no new scientific claims.

@@ -106,4 +106,5 @@ REPORT.md   REPORT.en.md  # 完整分析报告（论文解读 + 结果 + 局限�
 CRITIQUE.md CRITIQUE.en.md# 对抗性附录（最易受质疑的假设与结论）
 ARCHITECTURE.md           # 架构与开发指南
 CHANGELOG.md              # 版本演进（每版标注对结论有无影响）
+ROADMAP.md                # 待办与未来工作（区分本仿真欠账 / 论文开放问题）
 ```
