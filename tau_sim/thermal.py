@@ -97,6 +97,7 @@ def sustained(tiers: int, style: str = "logic-on-logic",
         weights = np.ones(tiers)
 
     def dt_at(x: float) -> float:
+        """相对频率 x 处的最热层温升（K）：先由 f 反推 V，再算功率。"""
         v = v_of_freq(x, node)
         nd = P.NODES[node]
         p_factor = c_dyn * (v / nd["vdd"]) ** 2 * x    # q ∝ C·V²·f

@@ -71,6 +71,14 @@ def iteration_tau(cfg: SystemConfig) -> dict:
 
 
 def total_tau(cfg: SystemConfig) -> float:
+    """单次训练迭代的系统 τ（秒）= 四个分量之和。
+
+    Args:
+        cfg: 系统配置（规模、各层加速杠杆、fabric）。
+
+    Returns:
+        float: 迭代总时长，单位秒。
+    """
     return float(sum(iteration_tau(cfg).values()))
 
 
@@ -114,10 +122,12 @@ def decade_trajectories(years: int = 10, n_gpus: int = 4096) -> dict:
     t0 = total_tau(base)
 
     def run_device_only():
+        """路线一：只推器件节点，算力每年 +15%，fabric 与内存不动。"""
         return np.array([total_tau(replace(base, k_compute=1.15 ** y))
                          for y in range(years + 1)])
 
     def run_fabric_only():
+        """路线二：只换网络代际（TCP→RDMA→UB+Hi-ONE），计算侧不动。"""
         taus = []
         for y in range(years + 1):
             fab = ("legacy_tcp" if y < 2 else
@@ -126,6 +136,8 @@ def decade_trajectories(years: int = 10, n_gpus: int = 4096) -> dict:
         return np.array(taus)
 
     def run_tau_first():
+        """路线三：全栈 τ-first——器件年增 15% 打底，另把每年一次定向
+        改进（+20%）投给当年的主导 τ 层，并按论文路线图安排里程碑。"""
         taus = [t0]
         cfg = replace(base)
         for y in range(1, years + 1):

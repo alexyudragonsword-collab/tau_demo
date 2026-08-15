@@ -36,6 +36,7 @@ C = style.SERIES
 
 
 def T(zh, en):
+    """返回当前语言对应的字符串（LANG 由 --lang 决定）。"""
     return zh if LANG == "zh" else en
 
 
@@ -68,14 +69,17 @@ TR_STAGE = {
 
 
 def tr_traj(name):
+    """把 cascade 返回的中文轨迹名按语言翻成英文。"""
     return name if LANG == "zh" else TR_TRAJ[name]
 
 
 def tr_stage(name):
+    """把 bottleneck_migration 返回的中文阶段名按语言翻成英文。"""
     return name if LANG == "zh" else TR_STAGE[name]
 
 
 def save(fig, name):
+    """保存图到 FIGDIR（中文 figures/，英文 figures_en/）并关闭 figure。"""
     path = os.path.join(FIGDIR, name)
     fig.savefig(path)
     plt.close(fig)
@@ -87,6 +91,7 @@ def save(fig, name):
 # =====================================================================
 
 def fig1_device():
+    """图1 · Layer 1：几何缩放收益趋平（P1）。左轴三条归一化延迟曲线，右轴互连占比柱。"""
     pts = scan_nodes()
     x = np.arange(len(pts))
     ideal = np.array([p.tau_ideal_ps for p in pts])
@@ -137,6 +142,7 @@ def fig1_device():
 # =====================================================================
 
 def fig2_fold_criterion():
+    """图2 · Layer 2：折叠判据 τ_Benefit vs τ_Penalty 随键合 pitch 的交叉（P2）。"""
     pitches = np.linspace(0.5, 6.0, 45)
     res = pitch_sweep("7nm", 2, pitches)
     ben = np.array([r.tau_benefit_ps for r in res])
@@ -183,6 +189,7 @@ def fig2_fold_criterion():
 # =====================================================================
 
 def fig3_fold_gains():
+    """图3 · Layer 2：折叠收益（线长/频率/密度）模型 vs 论文 Kirin 实测（P2）。"""
     r2 = fold("7nm", tiers=2, hb_pitch_um=1.5)
     r4 = fold("7nm", tiers=4, hb_pitch_um=1.5)
 
@@ -224,6 +231,7 @@ def fig3_fold_gains():
 # =====================================================================
 
 def fig4_fanout():
+    """图4 · Layer 3：N²-vs-N 扇出困境——可达算力发散与 2.5D ridge 上移（P3）。"""
     sides = np.linspace(8, 64, 60)
     pts = [evaluate(s) for s in sides]
     peak = np.array([p.peak_tflops for p in pts])
@@ -292,6 +300,7 @@ def fig4_fanout():
 # =====================================================================
 
 def fig5_cluster():
+    """图5 · Layer 4：大消息扩展效率与小消息 MoE 时延，含 SimPy DES 验证点（P4）。"""
     ns = np.array([8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096,
                    8192, 16384])
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.5, 4.4))
@@ -347,6 +356,7 @@ def fig5_cluster():
 # =====================================================================
 
 def fig6_amdahl():
+    """图6 · 级联实验 A：单层优化的 Amdahl 饱和与各层加速上限（P5）。"""
     res = amdahl_scan(SystemConfig(n_gpus=4096, fabric="legacy_tcp"))
     fig, ax = style.new_fig(7.5, 4.6)
     for layer in ["comm", "compute", "memory", "other"]:
@@ -374,6 +384,7 @@ def fig6_amdahl():
 # =====================================================================
 
 def fig7_decade():
+    """图7 · 级联实验 B：十年演进三条路线的系统 τ 轨迹与年化 α（P5）。"""
     traj = decade_trajectories()
     years = np.arange(len(next(iter(traj.values()))))
     fig, ax = style.new_fig(7.5, 4.6)
@@ -403,6 +414,7 @@ def fig7_decade():
 # =====================================================================
 
 def fig8_bottleneck():
+    """图8 · 级联实验 C：五阶段瓶颈迁移，主导 τ 层逐步转移（P5）。"""
     stages = bottleneck_migration()
     names = [tr_stage(s[0]) for s in stages]
     keys = ["compute", "memory", "comm", "other"]
@@ -440,6 +452,7 @@ def fig8_bottleneck():
 # =====================================================================
 
 def fig9_thermal():
+    """图9 · 热约束：多层折叠可持续频率与温升构成（论文开放问题 §6）。"""
     res = thermal_scan()
     tiers = [1, 2, 3, 4]
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(12.4 if LANG == "en" else 11.5, 4.4))
@@ -503,6 +516,7 @@ def fig9_thermal():
 # =====================================================================
 
 def fig10_alpha():
+    """图10 · 级联实验 D：论文 AI 侧 α≈10/年 的口径分解。"""
     d = alpha_decomposition()
     years = d["years"]
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(12.4 if LANG == "en" else 11.5, 4.4))
@@ -567,6 +581,7 @@ def fig10_alpha():
 # =====================================================================
 
 def summary(fold2, stages):
+    """控制台打印模型结果与论文数字的对照表。"""
     tgt = P.PAPER_TARGETS
     print("\n" + "=" * 68)
     print("对照论文数字（模型输入均来自独立文献, 详见 tau_sim/params.py）")

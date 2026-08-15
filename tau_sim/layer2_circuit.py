@@ -54,11 +54,33 @@ def davis_distribution(n_gates: float, p: float):
 
 
 def mean_wirelength_gp(n_gates: float, p: float) -> float:
+    """Davis 分布下的平均互连线长（单位：门间距 gate pitch）。
+
+    Args:
+        n_gates: 门数。
+        p: Rent 指数——越大表示互连需求越"发散"，长线越多。
+
+    Returns:
+        float: 以门间距为单位的平均线长。
+    """
     l, m = davis_distribution(n_gates, p)
     return float(np.sum(l * m) / np.sum(m))
 
 
 def percentile_wirelength_gp(n_gates: float, p: float, q: float) -> float:
+    """Davis 分布的线长分位数（单位：门间距）。
+
+    关键路径由长线主导，因此折叠模型取高分位（而非均值）来代表
+    临界路径上的互连。
+
+    Args:
+        n_gates: 门数。
+        p: Rent 指数。
+        q: 分位点，0–1（如 0.99 表示最长的 1% 线）。
+
+    Returns:
+        float: 该分位处的线长，以门间距为单位。
+    """
     l, m = davis_distribution(n_gates, p)
     cdf = np.cumsum(m) / np.sum(m)
     return float(l[int(np.searchsorted(cdf, q))])

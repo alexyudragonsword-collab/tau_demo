@@ -3,3 +3,6 @@ scipy>=1.10
 matplotlib>=3.7
 simpy>=4.0
 streamlit>=1.30
+markdown>=3.5
+# 可选：report_full.pdf 的导出需要 playwright（HTML 版无需）
+#   pip install playwright && playwright install chromium

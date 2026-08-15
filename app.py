@@ -286,22 +286,26 @@ with tab4:
 # ================= Tab 6 敏感性扫描 =================
 
 def _attr_param(mod, attr):
+    """把 (模块, 属性名) 包装成敏感性扫描用的 (getter, setter) 对。"""
     return (lambda: getattr(mod, attr)), (lambda v: setattr(mod, attr, v))
 
 
 def _ub_o():
+    """UB 每消息开销 o 的 getter/setter（同时作用于 ub_protocol 与 ub_hione）。"""
     return (lambda: P.FABRICS["ub_protocol"]["o"],
             lambda v: (P.FABRICS["ub_protocol"].__setitem__("o", v),
                        P.FABRICS["ub_hione"].__setitem__("o", v)))
 
 
 def _ub_a():
+    """UB 跨机延迟 α 的 getter/setter（同时作用于两个 UB fabric）。"""
     return (lambda: P.FABRICS["ub_protocol"]["alpha_inter"],
             lambda v: (P.FABRICS["ub_protocol"].__setitem__("alpha_inter", v),
                        P.FABRICS["ub_hione"].__setitem__("alpha_inter", v)))
 
 
 def _tcp_o():
+    """传统 TCP 栈每消息开销的 getter/setter。"""
     return (lambda: P.FABRICS["legacy_tcp"]["o"],
             lambda v: P.FABRICS["legacy_tcp"].__setitem__("o", v))
 
@@ -323,6 +327,7 @@ SENS_PARAMS = [
 
 
 def _crossover_pitch():
+    """折叠判据反转点 pitch（μm），敏感性面板的指标之一。"""
     for p_ in np.arange(0.5, 12.001, 0.1):
         r = fold("7nm", 2, float(p_))
         if r.tau_penalty_ps > r.tau_benefit_ps:

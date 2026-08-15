@@ -29,6 +29,19 @@ class PackagePoint:
 
 def evaluate(side_mm: float,
              workloads: dict | None = None) -> PackagePoint:
+    """给定 die/封装等效边长，算峰值算力与两种供带宽方式（论文 P3）。
+
+    扇出困境的算术核心：峰值算力 ∝ N²（面积），2.5D 的 HBM 只能沿边缘
+    排布故带宽 ∝ N（周长），而 3D folding 经表面供给故 ∝ N²。两者斜率
+    不同，规模越大差距越大。
+
+    Args:
+        side_mm: die 或封装的等效边长（mm）；>26mm 视为多 reticle 拼接。
+        workloads: {负载名: 运算强度 FLOP/B}，默认训练 GEMM 与推理 decode。
+
+    Returns:
+        PackagePoint: 峰值算力、两种带宽，以及各负载在两种供给下的利用率。
+    """
     workloads = workloads or {"训练 GEMM": P.GEMM_INTENSITY,
                               "推理 decode": P.DECODE_INTENSITY}
     peak = P.COMPUTE_DENSITY_TFLOPS_MM2 * side_mm ** 2          # TFLOPS
@@ -40,6 +53,7 @@ def evaluate(side_mm: float,
 
     # I (FLOP/B) × BW (TB/s) = I·BW TFLOPS
     def util(bw_tbs):
+        """各负载的算力利用率 = min(1, 强度×带宽 / 峰值)（roofline）。"""
         return {name: min(1.0, intensity * bw_tbs / peak)
                 for name, intensity in workloads.items()}
 

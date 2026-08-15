@@ -132,6 +132,7 @@ def simpy_ring_allreduce(n: int, vol_bytes: float, fabric: dict,
     arrived = [0] * (2 * (n - 1))
 
     def worker(rank: int):
+        """单卡进程：2(n−1) 步，每步向右邻发一个 chunk 后等全体到齐。"""
         for step in range(2 * (n - 1)):
             with links[rank].request() as req:
                 yield req
@@ -160,6 +161,7 @@ def simpy_alltoall(n: int, msg_bytes: float, fabric: dict,
     remaining = [n * (n - 1)]
 
     def sender(rank: int):
+        """单卡进程：向其余 n−1 张卡各发一条消息，共享本卡出链路。"""
         for dst in range(n):
             if dst == rank:
                 continue

@@ -12,6 +12,7 @@ FIGS = [f"fig{i}_" for i in range(1, 11)]  # 仅用于计数说明
 
 
 def b64(figdir: str, idx: int) -> str:
+    """读取 figdir 下第 idx 张图并编码为 data URI。"""
     import glob
     m = glob.glob(os.path.join(HERE, figdir, f"fig{idx}_*.png"))
     with open(m[0], "rb") as f:
@@ -19,12 +20,14 @@ def b64(figdir: str, idx: int) -> str:
 
 
 def fill(body: str, figdir: str) -> str:
+    """把模板中的 {{FIG1}}..{{FIG10}} 占位符替换为内嵌图片。"""
     for i in range(1, 11):
         body = body.replace("{{FIG%d}}" % i, b64(figdir, i))
     return body
 
 
 def split_head_body(path: str):
+    """在 </style> 处切分模板，返回 (head, body)。"""
     with open(path, encoding="utf-8") as f:
         html = f.read()
     i = html.index("</style>") + len("</style>")
@@ -65,6 +68,7 @@ TOGGLE_JS = """
 
 
 def build() -> str:
+    """拼装中英双语 dashboard.html（含语言切换）并写盘。"""
     head, body_zh = split_head_body(os.path.join(HERE, "dashboard_template.html"))
     _, body_en = split_head_body(os.path.join(HERE, "dashboard_template.en.html"))
     body_zh = fill(body_zh, "figures")

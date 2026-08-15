@@ -19,6 +19,7 @@ from tau_sim.cascade import decade_trajectories
 
 
 def crossover_pitch() -> float:
+    """当前参数下折叠判据由成立转为反转的键合 pitch（μm）。"""
     res = pitch_sweep("7nm", 2, np.linspace(0.5, 12, 80))
     for r in res:
         if r.tau_penalty_ps > r.tau_benefit_ps:
@@ -27,10 +28,12 @@ def crossover_pitch() -> float:
 
 
 def alpha_of(traj: np.ndarray) -> float:
+    """给定十年 τ 轨迹，反推年化压缩率 α。"""
     return (1.0 / traj[-1]) ** (1.0 / (len(traj) - 1))
 
 
 def check(label: str) -> dict:
+    """计算当前参数下的全部被监测指标，供扰动前后对比。"""
     r = fold("7nm", 2, 1.5)
     xp = crossover_pitch()
     tr = decade_trajectories()
@@ -45,6 +48,7 @@ def check(label: str) -> dict:
 
 
 def perturb(obj, attr, value):
+    """临时改写某个模块属性并重算指标，退出时恢复原值。"""
     old = getattr(obj, attr)
     setattr(obj, attr, value)
     return old
@@ -93,6 +97,7 @@ if __name__ == "__main__":
     print("\n热约束扰动检查:")
 
     def check_thermal(label):
+        """热约束相关指标的扰动检查（可持续频率等）。"""
         het = TH.sustained(2, "logic-on-memory", "mobile")
         hom = TH.sustained(2, "logic-on-logic", "mobile")
         ai4 = TH.sustained(4, "logic-on-logic", "ai")

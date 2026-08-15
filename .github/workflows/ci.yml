@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # 锁定 REPORT.md 中每个数字的黄金值——结论漂移即失败
+      - name: Regression tests (golden values)
+        run: python tests/test_regression.py
+
+      # tau_lab_model.js 是手工移植，必须与 Python 基线逐项一致
+      - name: Cross-check JS model vs Python
+        run: python tests/test_crosscheck.py
+
+      # 端到端：两种语言的全部图表都要能生成
+      - name: Generate figures (zh + en)
+        run: |
+          python run_all.py
+          python run_all.py --lang en
+
+      - name: Sensitivity check
+        run: python sensitivity.py
+
+      # 交互页与报告页的构建管线不能断
+      - name: Build self-contained pages
+        run: |
+          python build_tau_lab.py
+          python build_report.py --html
+          python build_critique.py
+          python build_dashboard.py
+
+      - name: Upload figures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: figures
+          path: |
+            figures/
+            figures_en/
+          retention-days: 14

@@ -66,6 +66,7 @@ CAPTIONS_EN = {
 
 
 def data_uri(fname: str, figdir: str) -> str:
+    """把 figdir 下的 PNG 读成 base64 data URI，供内嵌。"""
     with open(os.path.join(HERE, figdir, fname), "rb") as f:
         return "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
@@ -87,6 +88,7 @@ def inject_figures(md_text: str, figdir: str = "figures",
 
 
 def render_body(md_path: str, figdir: str, captions: dict) -> str:
+    """渲染单一语言的 Markdown 正文（注入图片、包装表格）为 HTML 片段。"""
     with open(os.path.join(HERE, md_path), encoding="utf-8") as f:
         src = f.read()
     src = inject_figures(src, figdir, captions)
@@ -183,6 +185,7 @@ _PAGE = """<!doctype html><html lang="zh-CN" data-lang="zh"><head><meta charset=
 
 
 def build_bilingual(zh_md, en_md, title_zh, title_en, out_name):
+    """把中英两份 Markdown 渲染成一个带 中/EN 切换的自包含 HTML。"""
     body_zh = render_body(zh_md, "figures", CAPTIONS)
     body_en = render_body(en_md, "figures_en", CAPTIONS_EN)
     html = _PAGE.format(css=CSS, body_zh=body_zh, body_en=body_en,
@@ -197,6 +200,7 @@ def build_bilingual(zh_md, en_md, title_zh, title_en, out_name):
 
 
 def build_pdf(html_path: str, out_name="report_full.pdf") -> None:
+    """用 Chromium 无头打印 HTML 为 A4 PDF。"""
     import glob
     from playwright.sync_api import sync_playwright
     exe = glob.glob("/opt/pw-browsers/chromium-*/chrome-linux/chrome")

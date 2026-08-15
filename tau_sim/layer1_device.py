@@ -49,12 +49,26 @@ def buffered_wire_ps_per_um(node: str) -> float:
 
 
 def device_tau(node: str, ref_node: str = "28nm") -> DeviceTau:
+    """单个工艺节点的 τ 分解（论文 P1 的核心证据）。
+
+    返回三条可对比的延迟：门本征 FO4（含速度饱和）、长沟道平方律假想
+    （速度饱和不存在时"本应"拿到的收益）、以及加上固定跨度中间布线后
+    的级延迟。三者之差即"几何缩放收益被互连吃掉"的量化。
+
+    Args:
+        node: 工艺节点名，须存在于 ``params.NODES``（如 "7nm"）。
+        ref_node: 归一化基准节点，平方律假想以它的 FO4 为起点。
+
+    Returns:
+        DeviceTau: 各延迟分量（ps）与互连占比。
+    """
     nd, ref = P.NODES[node], P.NODES[ref_node]
 
     tau_int = nd["fo4"]
 
     # 长沟道平方律假想（速度饱和不存在时几何缩放本应有的收益）
     def sq_delay(n):
+        """长沟道 Shockley 模型下的相对门延迟 ∝ Lg²·Vdd/(Vdd−Vth)^μ。"""
         return n["lg"] ** 2 * n["vdd"] / (n["vdd"] - n["vth"]) ** P.MU_LONG_CHANNEL
 
     tau_sq = ref["fo4"] * sq_delay(nd) / sq_delay(ref)
@@ -67,4 +81,9 @@ def device_tau(node: str, ref_node: str = "28nm") -> DeviceTau:
 
 
 def scan_nodes() -> list[DeviceTau]:
+    """按 ``params.NODE_ORDER`` 逐节点求 τ 分解（28nm→3nm）。
+
+    Returns:
+        list[DeviceTau]: 与 NODE_ORDER 同序；fig1 与器件层面板的数据源。
+    """
     return [device_tau(n) for n in P.NODE_ORDER]
