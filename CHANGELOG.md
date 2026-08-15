@@ -173,6 +173,6 @@
 
 ---
 
-> 只有 v1.0.0 建有 GitHub Release；0.x 各版本的内容见上文，对应 commit 可在 git 历史中按上述描述定位。
+> 只有 1.0.0 建有 GitHub Release；0.x 各版本的内容见上文，对应 commit 可在 git 历史中按上述描述定位。
 
-[1.0.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v1.0.0
+[1.0.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/1.0.0
