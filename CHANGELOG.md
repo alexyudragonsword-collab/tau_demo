@@ -35,7 +35,7 @@
 
 ---
 
-## [0.9.0] — 管理层汇报材料
+## 0.9.0 — 管理层汇报材料
 
 **结论影响：无结论变更。**
 
@@ -47,7 +47,7 @@
 
 ---
 
-## [0.8.0] — 四个 HTML 页面中英双语化
+## 0.8.0 — 四个 HTML 页面中英双语化
 
 **结论影响：无结论变更**（仅呈现语言与图表标签）。
 
@@ -68,7 +68,7 @@
 
 ---
 
-## [0.7.0] — 对抗性附录
+## 0.7.0 — 对抗性附录
 
 **结论影响：新增审阅结论**（不改动既有仿真数字，是对论文主张的独立评估）。
 
@@ -80,7 +80,7 @@
 
 ---
 
-## [0.6.0] — 两个 GUI 补齐 REPORT 的全部仿真
+## 0.6.0 — 两个 GUI 补齐 REPORT 的全部仿真
 
 **结论影响：无结论变更**（新面板复现的是既有实验）。
 
@@ -98,7 +98,7 @@
 
 ---
 
-## [0.5.0] — 图文并茂的完整报告
+## 0.5.0 — 图文并茂的完整报告
 
 **结论影响：无结论变更。**
 
@@ -112,7 +112,7 @@
 
 ---
 
-## [0.4.0] — 交互式敏感性扫描
+## 0.4.0 — 交互式敏感性扫描
 
 **结论影响：无结论变更**（把既有的脚本式敏感性检查交互化）。
 
@@ -123,7 +123,7 @@
 
 ---
 
-## [0.3.0] — 交互式仿真 GUI（双路线）
+## 0.3.0 — 交互式仿真 GUI（双路线）
 
 **结论影响：无结论变更**（JS 移植与 Python 基线逐项一致）。
 
@@ -134,7 +134,7 @@
 
 ---
 
-## [0.2.0] — 热约束与 α 口径分解
+## 0.2.0 — 热约束与 α 口径分解
 
 **结论影响：新增两组结论。**
 
@@ -150,7 +150,7 @@
 
 ---
 
-## [0.1.0] — 四层级联仿真与五命题验证
+## 0.1.0 — 四层级联仿真与五命题验证
 
 **结论影响：建立全部基线结论。**
 
@@ -173,13 +173,6 @@
 
 ---
 
+> 只有 v1.0.0 建有 GitHub Release；0.x 各版本的内容见上文，对应 commit 可在 git 历史中按上述描述定位。
+
 [1.0.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v1.0.0
-[0.9.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v0.9.0
-[0.8.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v0.8.0
-[0.7.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v0.7.0
-[0.6.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v0.6.0
-[0.5.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v0.5.0
-[0.4.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v0.4.0
-[0.3.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v0.3.0
-[0.2.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v0.2.0
-[0.1.0]: https://github.com/alexyudragonsword-collab/tau_demo/releases/tag/v0.1.0
