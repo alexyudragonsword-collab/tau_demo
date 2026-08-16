@@ -1,0 +1,28 @@
+version: 0.1
+project:
+  name: "tau_demo"
+  summary: "对何庭波《A Time Scaling Theory for Multi-Layer Electronic Systems》核心主张的独立仿真验证：四层级联模型 + 对抗性审阅，数字本身即交付物。"
+cairn:
+  knowledge_dir: "cairn"
+  # Date of the skill spec this instance was initialized against, or last
+  # upgraded to. Stamped automatically by init from references/upgrade.md's
+  # "Current spec date" (not a user decision); re-stamped after each instance
+  # upgrade. Audit/upgrade drift checks compare it against the upgrade.md
+  # changelog. Missing field = instance predates this mechanism: run the full
+  # changelog (see references/upgrade.md).
+  skill_spec_date: "2026-08-07"
+  # git_policy: track | ignore | private_sync
+  git_policy: "track"
+  # reference_git_policy (optional): same enum as git_policy, scoped only to
+  # cairn/Reference/ (external raw input the project owns but didn't author —
+  # a client's PDF, a call transcript). Omit to inherit git_policy above.
+  # 本项目未单独设置：Reference/ 若出现，继承 track（项目所有输入均取自公开文献）。
+  # language: en | zh | ... — language used when writing AGENTS.md/LOG.md/ROADMAP.md/topic notes for this project
+  language: "zh"
+graduation:
+  # (c) Deferred — 暂缓对接：尚未连接任何知识库。provider 相关决策留到首次毕业时收集
+  #     (see references/graduation.md → Deferred provider)。
+  provider: none
+history:
+  # migration_mode: start_fresh | inventory_only | selective_migrate
+  migration_mode: "inventory_only"
