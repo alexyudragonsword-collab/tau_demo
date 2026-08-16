@@ -112,5 +112,10 @@ REPORT.md   REPORT.en.md  # full analysis report (reading of the paper + results
 CRITIQUE.md CRITIQUE.en.md# adversarial appendix (assumptions most open to challenge)
 ARCHITECTURE.md           # architecture and development guide
 CHANGELOG.md              # release history (each entry flags whether conclusions changed)
-ROADMAP.md                # open work (separates this simulation's debts from the paper's open questions)
+AGENTS.md / CLAUDE.md     # Project Cairn collaboration rules (CLAUDE.md is an @AGENTS.md stub)
+cairn/                    # project knowledge layer (Project Cairn)
+├── ROADMAP.md            # open work (separates this simulation's debts from the paper's open questions)
+├── LOG.md                # chronological log (newest first)
+├── 项目约定与陷阱.md      # commands, architecture digest, pitfalls actually hit
+└── 历史文档清单.md        # inventory of pre-existing docs and their authority
 ```

@@ -106,5 +106,10 @@ REPORT.md   REPORT.en.md  # 完整分析报告（论文解读 + 结果 + 局限�
 CRITIQUE.md CRITIQUE.en.md# 对抗性附录（最易受质疑的假设与结论）
 ARCHITECTURE.md           # 架构与开发指南
 CHANGELOG.md              # 版本演进（每版标注对结论有无影响）
-ROADMAP.md                # 待办与未来工作（区分本仿真欠账 / 论文开放问题）
+AGENTS.md / CLAUDE.md     # Project Cairn 协作规则入口（CLAUDE.md 为 @AGENTS.md 桩）
+cairn/                    # 项目知识层（Project Cairn）
+├── ROADMAP.md            # 待办与未来工作（区分本仿真欠账 / 论文开放问题）
+├── LOG.md                # 时序日志（最新在上）
+├── 项目约定与陷阱.md      # 常用命令、架构速览、踩过的坑
+└── 历史文档清单.md        # 既有文档的登记与权威性说明
 ```

@@ -245,7 +245,7 @@ capability = N_chips (α_scale=1.58) × per_chip (α_chip=1.25) × 扩展效率 
 | `build_slides.js` | 生成 8 页管理层汇报 slides_tau_scaling.pptx |
 | `CRITIQUE.md`(+`.en.md`) | 对抗性附录：论文最易受质疑的假设与结论 |
 | `ARCHITECTURE.md` / `CLAUDE.md` | 架构与开发指南 / 会话级项目约定 |
-| `CHANGELOG.md` / `ROADMAP.md` | 版本演进（标注结论影响） / 待办与未来工作 |
+| `CHANGELOG.md` / `cairn/ROADMAP.md` | 版本演进（标注结论影响） / 待办与未来工作 |
 
 > 说明：交互式 GUI（`tau_lab.html`、`app.py`）与静态报告页仅改变呈现形式，
 > 所用模型、参数、结论与本报告完全一致，不引入任何新的科学主张。

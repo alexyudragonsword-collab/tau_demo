@@ -245,7 +245,7 @@ Applying ±50%-order perturbations to 17 sets of key parameters (Rent exponent, 
 | `build_slides.js` | Generates the 8-slide deck slides_tau_scaling.pptx |
 | `CRITIQUE.md`(+`.en.md`) | Adversarial appendix: assumptions and conclusions most open to challenge |
 | `ARCHITECTURE.md` / `CLAUDE.md` | Architecture & development guide / session-level project conventions |
-| `CHANGELOG.md` / `ROADMAP.md` | Release history (flagging conclusion impact) / open work |
+| `CHANGELOG.md` / `cairn/ROADMAP.md` | Release history (flagging conclusion impact) / open work |
 
 > Note: the interactive GUIs (`tau_lab.html`, `app.py`) and the static report page only change the form of presentation;
 > the models, parameters, and conclusions used are identical to this report and introduce no new scientific claims.
